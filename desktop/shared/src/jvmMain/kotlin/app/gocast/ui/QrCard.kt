@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,10 +33,12 @@ fun QrCard(session: JoinSession){
             contentDescription = "QR code to join session",
             modifier = Modifier.size(256.dp),
         )
-        Text(
-            text = session.joinUrl,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 16.dp),
-        )
+        SelectionContainer {
+            Text(
+                text = session.joinUrl,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
     }
 }

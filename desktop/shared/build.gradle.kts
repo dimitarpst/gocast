@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinx.serialization)
 }
 
 kotlin {
@@ -26,6 +27,8 @@ kotlin {
             implementation(libs.ktor.server.netty)
             implementation(libs.zxing.core)
             implementation(libs.zxing.javase)
+            implementation(libs.ktor.server.websockets)
+            implementation(libs.kotlinx.serialization.json)
         }
     }
 }

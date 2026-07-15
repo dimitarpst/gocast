@@ -6,5 +6,5 @@ data class JoinSession(
     val token: String,
 ){
     val joinUrl
-        get() = "gocast://join#a=$host:$port&t=$token"
+        get() = "gocast://join?a=$host:$port&t=$token"
 }
