@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.gocast",
+      "sha256_cert_fingerprints": [
+        "D0:81:15:91:B6:4A:B1:34:4B:29:0D:8D:4C:43:DD:A9:98:DF:76:8F:F7:04:5E:73:73:77:0D:3A:E0:49:E3:5E"
+      ]
+    }
+  }
+]

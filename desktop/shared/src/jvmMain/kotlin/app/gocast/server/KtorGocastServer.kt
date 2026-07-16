@@ -11,11 +11,14 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
+import io.ktor.server.websocket.pingPeriod
+import io.ktor.server.websocket.timeout
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.seconds
 
 class KtorGocastServer : GocastServer {
 
@@ -30,7 +33,7 @@ class KtorGocastServer : GocastServer {
     override suspend fun start(port: Int) {
         if(isRunning) return
 
-        engine = embeddedServer(Netty, port = port) {
+        engine = embeddedServer(Netty, host = "0.0.0.0", port = port) {
             configureRouting()
         }.start(wait = false)
     }
@@ -41,7 +44,10 @@ class KtorGocastServer : GocastServer {
     }
 
     private fun Application.configureRouting() {
-        install(WebSockets)
+        install(WebSockets){
+            pingPeriod = 15.seconds
+            timeout = 15.seconds
+        }
         routing {
             get("/health") {
                 call.respondText("gocast ok")
