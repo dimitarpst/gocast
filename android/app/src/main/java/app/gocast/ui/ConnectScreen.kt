@@ -4,6 +4,7 @@ import android.Manifest
 import android.net.Uri
 import android.os.Build
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -23,14 +24,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.gocast.R
 import app.gocast.capture.CaptureConsent
 import app.gocast.cast.CastEvent
 import app.gocast.cast.CastViewModel
 import app.gocast.domain.ConnectionState
+import app.gocast.domain.JoinUrlParser
 import app.gocast.ui.quality.QualitySettingsScreen
+import io.github.g00fy2.quickie.QRResult
+import io.github.g00fy2.quickie.ScanCustomCode
+import io.github.g00fy2.quickie.config.BarcodeFormat
+import io.github.g00fy2.quickie.config.ScannerConfig
 
 @Composable
 fun ConnectScreen(
@@ -65,6 +73,39 @@ fun ConnectScreen(
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* ignore result — continue either way */ }
+
+    val scanInvalidMessage = stringResource(R.string.scan_qr_invalid)
+    val cameraDeniedMessage = stringResource(R.string.scan_qr_camera_denied)
+
+    val qrScanner = rememberLauncherForActivityResult(ScanCustomCode()) { result ->
+        when (result) {
+            is QRResult.QRSuccess -> {
+                val raw = result.content.rawValue
+                val uri = raw?.let { Uri.parse(it) }
+                if (JoinUrlParser.parse(uri) == null) {
+                    Toast.makeText(context, scanInvalidMessage, Toast.LENGTH_SHORT).show()
+                    return@rememberLauncherForActivityResult
+                }
+                viewModel.onDeepLink(uri)
+            }
+            is QRResult.QRMissingPermission -> {
+                Toast.makeText(context, cameraDeniedMessage, Toast.LENGTH_SHORT).show()
+            }
+            is QRResult.QRUserCanceled,
+            is QRResult.QRError,
+            -> Unit
+        }
+    }
+
+    val scannerConfig = remember {
+        ScannerConfig.build {
+            setBarcodeFormats(listOf(BarcodeFormat.FORMAT_QR_CODE))
+            setOverlayStringRes(R.string.scan_qr_hint)
+            setHapticSuccessFeedback(true)
+            setShowTorchToggle(true)
+            setShowCloseButton(true)
+        }
+    }
 
     // Collect consent events before resume/deeplink so a one-shot resume tap
     // is not lost if it emits before the collector starts.
@@ -102,6 +143,9 @@ fun ConnectScreen(
         is ConnectionState.Failed -> state.reason
     }
 
+    val canScan = connectionState is ConnectionState.Idle ||
+        connectionState is ConnectionState.Failed
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -109,6 +153,12 @@ fun ConnectScreen(
     ) {
         Text(label, style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(16.dp))
+        if (canScan) {
+            Button(onClick = { qrScanner.launch(scannerConfig) }) {
+                Text(stringResource(R.string.scan_qr))
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         Button(onClick = { showQualitySettings = true }) {
             Text("Quality settings")
         }
