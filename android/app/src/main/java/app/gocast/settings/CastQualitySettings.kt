@@ -4,7 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * Every tunable quality knob for screen cast.
- * Applied on the next capture start / resume (not mid-stream).
+ * While casting, changes apply live (RTP/capture), via renegotiation (codec),
+ * or a soft media rebuild (encoder-factory flags) — no reshare required.
+ * When idle / paused, prefs are used on the next capture start / resume.
  */
 @Serializable
 data class CastQualitySettings(

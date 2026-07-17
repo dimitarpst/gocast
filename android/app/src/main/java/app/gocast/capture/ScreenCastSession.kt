@@ -23,7 +23,8 @@ class ScreenCastSession(
     private val onProjectionStopped: (() -> Unit)? = null,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val quality: CastQualitySettings = CastQualityStore.load(appContext)
+    @Volatile
+    private var quality: CastQualitySettings = CastQualityStore.load(appContext)
 
     private var eglBase: EglBase? = null
     private var factory: PeerConnectionFactory? = null
@@ -33,6 +34,7 @@ class ScreenCastSession(
     private var displayListener: DisplayManager.DisplayListener? = null
     private var lastWidth = 0
     private var lastHeight = 0
+    private var projectionData: Intent? = null
 
     @Volatile
     private var stopping = false
@@ -45,12 +47,69 @@ class ScreenCastSession(
 
     fun start(projectionData: Intent) {
         if (videoTrack != null || stopping) return
+        this.projectionData = projectionData
+        quality = CastQualityStore.load(appContext)
 
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(appContext)
                 .createInitializationOptions(),
         )
 
+        createFactoryAndCapturer(projectionData, existingCapturer = null)
+        registerDisplayListener()
+    }
+
+    /**
+     * Live-apply capture knobs (resolution scale, FPS, DPI) without tearing down
+     * MediaProjection or the PeerConnectionFactory.
+     */
+    fun applyQuality(next: CastQualitySettings) {
+        if (stopping || videoTrack == null) return
+        quality = next
+        val metrics = appContext.resources.displayMetrics
+        val (w, h) = scaledSize(metrics.widthPixels, metrics.heightPixels)
+        lastWidth = w
+        lastHeight = h
+        val screenCapturer = capturer as? GocastScreenCapturer ?: return
+        try {
+            screenCapturer.applyDisplayParams(w, h, next.virtualDisplayDpi)
+        } catch (e: Exception) {
+            Log.w(TAG, "applyDisplayParams failed", e)
+        }
+    }
+
+    /**
+     * Rebuild PeerConnectionFactory / track / surface helper while keeping the
+     * same MediaProjection (no re-consent). Returns false if rebuild is not possible.
+     */
+    fun rebuildKeepingProjection(next: CastQualitySettings): Boolean {
+        if (stopping) return false
+        val screenCapturer = capturer as? GocastScreenCapturer ?: return false
+        val data = projectionData ?: return false
+
+        quality = next
+        try {
+            screenCapturer.stopCaptureKeepingProjection()
+        } catch (e: Exception) {
+            Log.w(TAG, "stopCaptureKeepingProjection failed", e)
+            return false
+        }
+
+        disposeWebRtcStack(disposeCapturer = false)
+
+        try {
+            createFactoryAndCapturer(data, existingCapturer = screenCapturer)
+            return videoTrack != null && factory != null
+        } catch (e: Exception) {
+            Log.e(TAG, "rebuildKeepingProjection failed", e)
+            return false
+        }
+    }
+
+    private fun createFactoryAndCapturer(
+        projectionData: Intent,
+        existingCapturer: GocastScreenCapturer?,
+    ) {
         val egl = EglBase.create()
         eglBase = egl
 
@@ -68,7 +127,7 @@ class ScreenCastSession(
             .createPeerConnectionFactory()
         factory = pcFactory
 
-        val screenCapturer = GocastScreenCapturer(
+        val screenCapturer = existingCapturer ?: GocastScreenCapturer(
             projectionData,
             object : MediaProjection.Callback() {
                 override fun onStop() {
@@ -89,7 +148,13 @@ class ScreenCastSession(
         val source = pcFactory.createVideoSource(true)
         videoSource = source
 
-        screenCapturer.initialize(helper, appContext, source.capturerObserver)
+        if (existingCapturer != null) {
+            screenCapturer.rebind(helper, source.capturerObserver)
+        } else {
+            screenCapturer.initialize(helper, appContext, source.capturerObserver)
+        }
+        screenCapturer.setVirtualDisplayDpi(quality.virtualDisplayDpi)
+
         val metrics = appContext.resources.displayMetrics
         val sized = scaledSize(metrics.widthPixels, metrics.heightPixels)
         lastWidth = sized.first
@@ -99,8 +164,6 @@ class ScreenCastSession(
         val track = pcFactory.createVideoTrack("gocast_screen", source)
         track.setEnabled(true)
         videoTrack = track
-
-        registerDisplayListener()
     }
 
     private fun registerDisplayListener() {
@@ -127,7 +190,12 @@ class ScreenCastSession(
         lastWidth = w
         lastHeight = h
         try {
-            capturer?.changeCaptureFormat(w, h, quality.captureFps)
+            val screenCapturer = capturer as? GocastScreenCapturer
+            if (screenCapturer != null) {
+                screenCapturer.applyDisplayParams(w, h, quality.virtualDisplayDpi)
+            } else {
+                capturer?.changeCaptureFormat(w, h, quality.captureFps)
+            }
         } catch (e: Exception) {
             Log.w(TAG, "changeCaptureFormat failed", e)
         }
@@ -159,12 +227,19 @@ class ScreenCastSession(
             }
         }
 
-        try {
-            capturer?.dispose()
-        } catch (e: Exception) {
-            Log.w(TAG, "capturer dispose failed", e)
+        disposeWebRtcStack(disposeCapturer = true)
+        projectionData = null
+    }
+
+    private fun disposeWebRtcStack(disposeCapturer: Boolean) {
+        if (disposeCapturer) {
+            try {
+                capturer?.dispose()
+            } catch (e: Exception) {
+                Log.w(TAG, "capturer dispose failed", e)
+            }
+            capturer = null
         }
-        capturer = null
 
         try {
             videoTrack?.dispose()

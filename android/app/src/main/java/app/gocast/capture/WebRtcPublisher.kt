@@ -27,14 +27,36 @@ class WebRtcPublisher(
     private val factory: PeerConnectionFactory,
     private val videoTrack: VideoTrack,
     private val scope: CoroutineScope,
-    private val quality: CastQualitySettings,
+    quality: CastQualitySettings,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    @Volatile
+    private var quality: CastQualitySettings = quality
     private var peerConnection: PeerConnection? = null
     private var collectJob: Job? = null
     private var announceJob: Job? = null
     private var remoteDescriptionSet = false
     private val pendingIce = mutableListOf<IceCandidate>()
+
+    /**
+     * Update quality on the live publisher.
+     * @param renegotiate if true, dispose the PeerConnection and send a fresh offer
+     *   (needed for codec preference changes).
+     */
+    fun applyQuality(next: CastQualitySettings, renegotiate: Boolean) {
+        quality = next
+        if (renegotiate) {
+            createOfferForViewer()
+            return
+        }
+        val pc = peerConnection ?: return
+        applyVideoEncoding(pc)
+        pc.setBitrate(
+            quality.minBitrateBps.takeIf { it > 0 },
+            quality.startBitrateBps,
+            quality.maxBitrateBps,
+        )
+    }
 
     fun start() {
         collectJob?.cancel()

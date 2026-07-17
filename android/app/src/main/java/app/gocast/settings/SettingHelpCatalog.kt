@@ -97,7 +97,8 @@ object SettingHelpCatalog {
             "screen text can look mushier. Fine as fallbacks if H.264/H.265 aren’t available.\n\n" +
             "• AV1 — Rare on phones. Only pick this if you know both the phone and the PC support it.\n\n" +
             "Tip: stick with H.264 unless you’re experimenting. A software codec hurts Phone and " +
-            "Clarity more than bumping max bitrate one step.",
+            "Clarity more than bumping max bitrate one step.\n\n" +
+            "Changing this while casting briefly reconnects the video (no need to reshare).",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
             CostChip(CostAxis.PHONE, CostWeight.HEAVY),
@@ -162,7 +163,7 @@ object SettingHelpCatalog {
         body = "An extra shrink applied while compressing the video.\n\n" +
             "2× means half the width and height at encode time. " +
             "Prefer Resolution scale for the main size choice; use this only if you need " +
-            "another cut without restarting the cast setup.",
+            "another cut without changing capture size.",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
             CostChip(CostAxis.WIFI, CostWeight.HEAVY),
@@ -207,7 +208,8 @@ object SettingHelpCatalog {
     val intelVp8 = SettingHelp(
         title = "Intel VP8 encoder",
         body = "Optional encoder path used only with some codecs.\n\n" +
-            "Safe to leave on. Screen casting usually prefers H.264 anyway.",
+            "Safe to leave on. Screen casting usually prefers H.264 anyway.\n\n" +
+            "Changing this while casting briefly rebuilds the encoder (no need to reshare).",
         costs = listOf(
             CostChip(CostAxis.PHONE, CostWeight.LIGHT),
             CostChip(CostAxis.CLARITY, CostWeight.LIGHT),
@@ -218,7 +220,8 @@ object SettingHelpCatalog {
         title = "H.264 high profile",
         body = "Lets the phone’s H.264 encoder use a richer compression mode.\n\n" +
             "Usually means a clearer picture at the same Wi‑Fi budget. " +
-            "Turn off only if casting fails on a quirky device.",
+            "Turn off only if casting fails on a quirky device.\n\n" +
+            "Changing this while casting briefly rebuilds the encoder (no need to reshare).",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.NOTICEABLE),
             CostChip(CostAxis.PHONE, CostWeight.LIGHT),

@@ -1,5 +1,6 @@
 package app.gocast.ui.quality
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.gocast.capture.CaptureService
 import app.gocast.settings.CastQualityProfile
 import app.gocast.settings.CastQualitySettings
 import app.gocast.settings.CastQualityStore
@@ -50,6 +53,12 @@ import app.gocast.ui.quality.sections.CaptureSettingsSection
 import app.gocast.ui.quality.sections.CodecSettingsSection
 import app.gocast.ui.quality.sections.EncoderSettingsSection
 import kotlinx.coroutines.delay
+
+private enum class AutosaveStatus {
+    Idle,
+    Saving,
+    Autosaved,
+}
 
 @Composable
 fun QualitySettingsScreen(
@@ -68,10 +77,29 @@ fun QualitySettingsScreen(
     var detecting by remember { mutableStateOf(false) }
     var recommendation by remember { mutableStateOf<QualityRecommendation?>(null) }
     var weightPopup by remember { mutableStateOf<CostChip?>(null) }
+    var autosaveStatus by remember { mutableStateOf(AutosaveStatus.Idle) }
+    var autosaveToken by remember { mutableIntStateOf(0) }
+
+    BackHandler(onBack = onBack)
 
     fun refreshProfiles() {
         profiles = CastQualityStore.allProfiles(context)
         activeProfileId = CastQualityStore.activeProfileId(context)
+    }
+
+    fun notifyCastingSession() {
+        CaptureService.applyQualityIfCasting(context)
+    }
+
+    fun markAutosaving() {
+        autosaveStatus = AutosaveStatus.Saving
+        autosaveToken++
+    }
+
+    LaunchedEffect(autosaveToken) {
+        if (autosaveToken == 0) return@LaunchedEffect
+        delay(350)
+        autosaveStatus = AutosaveStatus.Autosaved
     }
 
     LaunchedEffect(detecting) {
@@ -87,6 +115,8 @@ fun QualitySettingsScreen(
         recommendation = tip
         detecting = false
         refreshProfiles()
+        notifyCastingSession()
+        markAutosaving()
     }
 
     fun persistSettings(next: CastQualitySettings) {
@@ -98,6 +128,8 @@ fun QualitySettingsScreen(
             CastQualityStore.setActiveProfileId(context, null)
             activeProfileId = null
         }
+        notifyCastingSession()
+        markAutosaving()
     }
 
     fun selectProfile(profile: CastQualityProfile) {
@@ -105,6 +137,8 @@ fun QualitySettingsScreen(
         settings = profile.settings
         activeProfileId = profile.id
         refreshProfiles()
+        notifyCastingSession()
+        markAutosaving()
     }
 
     val actions = QualityUiActions(
@@ -126,11 +160,23 @@ fun QualitySettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Cast quality", style = MaterialTheme.typography.headlineSmall)
-            TextButton(onClick = onBack) { Text("Done") }
+            when (autosaveStatus) {
+                AutosaveStatus.Idle -> Unit
+                AutosaveStatus.Saving -> Text(
+                    "Saving…",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                AutosaveStatus.Autosaved -> Text(
+                    "Autosaved",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
         Text(
             "Like game graphics presets — pick a profile, or tune and save your own. " +
-                "Changes apply on the next cast start / resume.",
+                "Changes apply while casting (codec/encoder may briefly reconnect).",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -340,6 +386,8 @@ fun QualitySettingsScreen(
                         activeProfileId = profile.id
                         refreshProfiles()
                         showSaveDialog = false
+                        notifyCastingSession()
+                        markAutosaving()
                     },
                 ) { Text("Save") }
             },

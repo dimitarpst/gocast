@@ -23,11 +23,12 @@ import org.webrtc.VideoSink
 class GocastScreenCapturer(
     private val mediaProjectionPermissionResultData: Intent,
     private val mediaProjectionCallback: MediaProjection.Callback,
-    private val virtualDisplayDpi: Int = VIRTUAL_DISPLAY_DPI_DEFAULT,
+    virtualDisplayDpi: Int = VIRTUAL_DISPLAY_DPI_DEFAULT,
 ) : VideoCapturer, VideoSink {
 
     private var width = 0
     private var height = 0
+    private var virtualDisplayDpi: Int = virtualDisplayDpi
     private var virtualDisplay: VirtualDisplay? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private var capturerObserver: CapturerObserver? = null
@@ -49,27 +50,50 @@ class GocastScreenCapturer(
             applicationContext.getSystemService(MediaProjectionManager::class.java)
     }
 
+    /**
+     * Rebind to a new SurfaceTextureHelper / CapturerObserver after a soft
+     * PeerConnectionFactory rebuild, keeping the existing MediaProjection.
+     */
+    @Synchronized
+    fun rebind(
+        surfaceTextureHelper: SurfaceTextureHelper,
+        capturerObserver: CapturerObserver,
+    ) {
+        checkNotDisposed()
+        this.surfaceTextureHelper = surfaceTextureHelper
+        this.capturerObserver = capturerObserver
+    }
+
+    @Synchronized
+    fun setVirtualDisplayDpi(dpi: Int) {
+        checkNotDisposed()
+        virtualDisplayDpi = dpi
+    }
+
     @Synchronized
     override fun startCapture(width: Int, height: Int, unusedFramerate: Int) {
         checkNotDisposed()
         this.width = width
         this.height = height
 
-        val manager = mediaProjectionManager
-            ?: throw IllegalStateException("Not initialized")
         val helper = surfaceTextureHelper
             ?: throw IllegalStateException("No SurfaceTextureHelper")
         val observer = capturerObserver
             ?: throw IllegalStateException("No CapturerObserver")
 
-        mediaProjection = manager.getMediaProjection(
-            Activity.RESULT_OK,
-            mediaProjectionPermissionResultData,
-        )
+        if (mediaProjection == null) {
+            val manager = mediaProjectionManager
+                ?: throw IllegalStateException("Not initialized")
+            mediaProjection = manager.getMediaProjection(
+                Activity.RESULT_OK,
+                mediaProjectionPermissionResultData,
+            )
+        }
         val projection = mediaProjection
             ?: throw IllegalStateException("MediaProjection is null")
-
+        // (Re)register — stopCaptureKeepingProjection unregisters the callback.
         projection.registerCallback(mediaProjectionCallback, helper.handler)
+
         createVirtualDisplay()
         observer.onCapturerStarted(true)
         helper.startListening(this)
@@ -92,6 +116,23 @@ class GocastScreenCapturer(
         }
     }
 
+    /**
+     * Release the VirtualDisplay and stop feeding frames, but leave
+     * MediaProjection alive so capture can restart without re-consent.
+     */
+    @Synchronized
+    fun stopCaptureKeepingProjection() {
+        checkNotDisposed()
+        val helper = surfaceTextureHelper ?: return
+        ThreadUtils.invokeAtFrontUninterruptibly(helper.handler) {
+            helper.stopListening()
+            capturerObserver?.onCapturerStopped()
+            virtualDisplay?.release()
+            virtualDisplay = null
+            mediaProjection?.unregisterCallback(mediaProjectionCallback)
+        }
+    }
+
     @Synchronized
     override fun dispose() {
         isDisposed = true
@@ -99,14 +140,22 @@ class GocastScreenCapturer(
 
     @Synchronized
     override fun changeCaptureFormat(width: Int, height: Int, unusedFramerate: Int) {
+        applyDisplayParams(width, height, virtualDisplayDpi)
+    }
+
+    /** Resize and/or update VirtualDisplay density while capturing. */
+    @Synchronized
+    fun applyDisplayParams(width: Int, height: Int, dpi: Int) {
         checkNotDisposed()
         if (width <= 0 || height <= 0) return
         val w = width / 2 * 2
         val h = height / 2 * 2
-        if (w == this.width && h == this.height) return
+        val dpiChanged = dpi != virtualDisplayDpi
+        if (w == this.width && h == this.height && !dpiChanged) return
 
         this.width = w
         this.height = h
+        virtualDisplayDpi = dpi
         val display = virtualDisplay ?: return
         val helper = surfaceTextureHelper ?: return
 
