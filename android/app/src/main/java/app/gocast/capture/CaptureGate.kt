@@ -30,7 +30,8 @@ class CaptureGate {
 
     fun onConsentResult(context: Context, resultCode: Int, data: Intent?) {
         if (resultCode == Activity.RESULT_OK && data != null) {
-            CaptureService.start(context, resultCode, data)
+            ProjectionPermissionHolder.set(resultCode, data)
+            CaptureService.start(context)
         } else {
             reset()
         }

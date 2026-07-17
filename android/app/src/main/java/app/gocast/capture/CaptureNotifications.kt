@@ -24,7 +24,7 @@ object CaptureNotifications {
         ensureChannel(context)
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("gocast")
-            .setContentText("Ready to cast")
+            .setContentText("Casting screen")
             .setSmallIcon(android.R.drawable.ic_menu_share)
             .setOngoing(true)
             .build()
