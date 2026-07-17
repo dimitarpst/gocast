@@ -4,6 +4,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -27,6 +29,8 @@ class CaptureService : Service() {
     private var projectionResultCode: Int = 0
     private var projectionData: Intent? = null
 
+    private var mediaProjection: MediaProjection? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -42,10 +46,17 @@ class CaptureService : Service() {
             notification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
         )
+        val data = projectionData
+        if (data != null && mediaProjection == null){
+            val manager = getSystemService(MediaProjectionManager::class.java)
+            mediaProjection = manager.getMediaProjection(projectionResultCode, data)
+        }
         return START_STICKY
     }
 
     override fun onDestroy() {
+        projectionData = null
+        mediaProjection = null
         projectionData = null
         super.onDestroy()
     }
