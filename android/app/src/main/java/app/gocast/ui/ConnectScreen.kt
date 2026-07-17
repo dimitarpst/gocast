@@ -3,6 +3,7 @@ package app.gocast.ui
 import android.Manifest
 import android.net.Uri
 import android.os.Build
+import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -25,10 +26,20 @@ import app.gocast.domain.ConnectionState
 @Composable
 fun ConnectScreen(
     deepLinkUri: Uri?,
+    resumeCastRequestId: Int = 0,
     viewModel: CastViewModel = viewModel(),
 ) {
     val context = LocalContext.current
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(connectionState) {
+        val window = (context as? android.app.Activity)?.window ?: return@LaunchedEffect
+        if (connectionState is ConnectionState.Connected) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     val captureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -40,10 +51,8 @@ fun ConnectScreen(
         ActivityResultContracts.RequestPermission(),
     ) { /* ignore result — continue either way */ }
 
-    LaunchedEffect(deepLinkUri) {
-        viewModel.onDeepLink(deepLinkUri)
-    }
-
+    // Collect consent events before resume/deeplink so a one-shot resume tap
+    // is not lost if it emits before the collector starts.
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
@@ -54,6 +63,19 @@ fun ConnectScreen(
                     captureLauncher.launch(CaptureConsent.createIntent(context))
                 }
             }
+        }
+    }
+
+    LaunchedEffect(deepLinkUri) {
+        // Resume opens MainActivity with no join URI — do not treat that as "stop".
+        if (deepLinkUri != null) {
+            viewModel.onDeepLink(deepLinkUri)
+        }
+    }
+
+    LaunchedEffect(resumeCastRequestId) {
+        if (resumeCastRequestId > 0) {
+            viewModel.onResumeCastRequested()
         }
     }
 

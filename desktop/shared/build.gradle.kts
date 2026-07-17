@@ -29,6 +29,7 @@ kotlin {
             implementation(libs.zxing.javase)
             implementation(libs.ktor.server.websockets)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.compose.webview)
         }
     }
 }

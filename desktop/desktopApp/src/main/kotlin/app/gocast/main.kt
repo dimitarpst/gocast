@@ -1,33 +1,33 @@
 package app.gocast
 
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.awt.SwingWindow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import app.gocast.server.KtorGocastServer
-import kotlinx.coroutines.runBlocking
+import androidx.compose.ui.window.rememberWindowState
 import app.gocast.domain.JvmSessionFactory
+import app.gocast.server.KtorGocastServer
 import app.gocast.server.SessionGuard
+import kotlinx.coroutines.runBlocking
 
-
-@OptIn(ExperimentalComposeUiApi::class)
-fun main() = runBlocking {
+fun main() {
     val server = KtorGocastServer()
-
-    try{
-        val session = JvmSessionFactory().create(8765)
-        SessionGuard.expectedToken = session.token
+    val session = runBlocking {
+        val created = JvmSessionFactory().create(8765)
+        SessionGuard.expectedToken = created.token
         server.start(8765)
-        application{
-            SwingWindow(
-                onCloseRequest = ::exitApplication,
-                title = "GoCast",
-                init = {}
-            ){
-                App(session)
-            }
-        }
-    } finally{
-        server.stop()
+        created
     }
 
+    application {
+        Window(
+            onCloseRequest = {
+                runBlocking { server.stop() }
+                exitApplication()
+            },
+            title = "gocast",
+            state = rememberWindowState(width = 1280.dp, height = 800.dp),
+        ) {
+            GocastRoot(session)
+        }
+    }
 }

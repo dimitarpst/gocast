@@ -2,6 +2,7 @@ package app.gocast.capture
 
 import android.content.Context
 import android.content.Intent
+import android.hardware.display.DisplayManager
 import android.media.projection.MediaProjection
 import android.os.Handler
 import android.os.Looper
@@ -10,7 +11,6 @@ import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
 import org.webrtc.PeerConnectionFactory
-import org.webrtc.ScreenCapturerAndroid
 import org.webrtc.SurfaceTextureHelper
 import org.webrtc.VideoCapturer
 import org.webrtc.VideoSource
@@ -18,6 +18,7 @@ import org.webrtc.VideoTrack
 
 class ScreenCastSession(
     private val appContext: Context,
+    private val onProjectionStopped: (() -> Unit)? = null,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -26,6 +27,9 @@ class ScreenCastSession(
     private var capturer: VideoCapturer? = null
     private var surfaceHelper: SurfaceTextureHelper? = null
     private var videoSource: VideoSource? = null
+    private var displayListener: DisplayManager.DisplayListener? = null
+    private var lastWidth = 0
+    private var lastHeight = 0
 
     @Volatile
     private var stopping = false
@@ -33,10 +37,11 @@ class ScreenCastSession(
     var videoTrack: VideoTrack? = null
         private set
 
+    val peerConnectionFactory: PeerConnectionFactory?
+        get() = factory
+
     fun start(projectionData: Intent) {
         if (videoTrack != null || stopping) return
-
-        Log.i(TAG, "Starting screen capturer")
 
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(appContext)
@@ -56,12 +61,15 @@ class ScreenCastSession(
             .createPeerConnectionFactory()
         factory = pcFactory
 
-        val screenCapturer = ScreenCapturerAndroid(
+        val screenCapturer = GocastScreenCapturer(
             projectionData,
             object : MediaProjection.Callback() {
                 override fun onStop() {
-                    Log.i(TAG, "MediaProjection stopped")
-                    mainHandler.post { stop() }
+                    mainHandler.post { onProjectionStopped?.invoke() }
+                }
+
+                override fun onCapturedContentResize(width: Int, height: Int) {
+                    mainHandler.post { applyCaptureSize(width, height) }
                 }
             },
         )
@@ -75,45 +83,108 @@ class ScreenCastSession(
 
         screenCapturer.initialize(helper, appContext, source.capturerObserver)
         val metrics = appContext.resources.displayMetrics
-        Log.i(TAG, "Calling startCapture ${metrics.widthPixels}x${metrics.heightPixels}")
-        screenCapturer.startCapture(metrics.widthPixels, metrics.heightPixels, 30)
+        lastWidth = metrics.widthPixels
+        lastHeight = metrics.heightPixels
+        screenCapturer.startCapture(lastWidth, lastHeight, 30)
 
         val track = pcFactory.createVideoTrack("gocast_screen", source)
         track.setEnabled(true)
         videoTrack = track
 
-        Log.i(TAG, "Screen capturer started ${metrics.widthPixels}x${metrics.heightPixels}")
+        registerDisplayListener()
     }
 
-    fun stop() {
+    private fun registerDisplayListener() {
+        val dm = appContext.getSystemService(DisplayManager::class.java)
+        val listener = object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+            override fun onDisplayRemoved(displayId: Int) = Unit
+            override fun onDisplayChanged(displayId: Int) {
+                mainHandler.post {
+                    val metrics = appContext.resources.displayMetrics
+                    applyCaptureSize(metrics.widthPixels, metrics.heightPixels)
+                }
+            }
+        }
+        displayListener = listener
+        dm.registerDisplayListener(listener, mainHandler)
+    }
+
+    private fun applyCaptureSize(width: Int, height: Int) {
+        if (stopping) return
+        val w = width / 2 * 2
+        val h = height / 2 * 2
+        if (w <= 0 || h <= 0) return
+        if (w == lastWidth && h == lastHeight) return
+        lastWidth = w
+        lastHeight = h
+        try {
+            capturer?.changeCaptureFormat(w, h, 30)
+        } catch (e: Exception) {
+            Log.w(TAG, "changeCaptureFormat failed", e)
+        }
+    }
+
+    fun stop(projectionAlreadyStopped: Boolean = false) {
         if (stopping) return
         stopping = true
 
-        try {
-            capturer?.stopCapture()
-        } catch (_: InterruptedException) {
-        } catch (e: Exception) {
-            Log.w(TAG, "stopCapture failed", e)
+        displayListener?.let { listener ->
+            appContext.getSystemService(DisplayManager::class.java)
+                .unregisterDisplayListener(listener)
         }
-        capturer?.dispose()
+        displayListener = null
+
+        if (!projectionAlreadyStopped) {
+            try {
+                capturer?.stopCapture()
+            } catch (_: InterruptedException) {
+            } catch (e: Exception) {
+                Log.w(TAG, "stopCapture failed", e)
+            }
+        }
+
+        try {
+            capturer?.dispose()
+        } catch (e: Exception) {
+            Log.w(TAG, "capturer dispose failed", e)
+        }
         capturer = null
 
-        videoTrack?.dispose()
+        try {
+            videoTrack?.dispose()
+        } catch (e: Exception) {
+            Log.w(TAG, "track dispose failed", e)
+        }
         videoTrack = null
 
-        videoSource?.dispose()
+        try {
+            videoSource?.dispose()
+        } catch (e: Exception) {
+            Log.w(TAG, "source dispose failed", e)
+        }
         videoSource = null
 
-        surfaceHelper?.dispose()
+        try {
+            surfaceHelper?.dispose()
+        } catch (e: Exception) {
+            Log.w(TAG, "surfaceHelper dispose failed", e)
+        }
         surfaceHelper = null
 
-        factory?.dispose()
+        try {
+            factory?.dispose()
+        } catch (e: Exception) {
+            Log.w(TAG, "factory dispose failed", e)
+        }
         factory = null
 
-        eglBase?.release()
+        try {
+            eglBase?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "egl release failed", e)
+        }
         eglBase = null
-
-        Log.i(TAG, "Screen capturer stopped")
     }
 
     companion object {

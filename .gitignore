@@ -1,3 +1,9 @@
 # Default ignored files
 /shelf/
 /workspace.xml
+desktop/kcef-bundle/
+desktop/kcef-cache/
+desktop/desktopApp/kcef-bundle/
+desktop/desktopApp/kcef-cache/
+**/kcef-bundle/
+**/kcef-cache/

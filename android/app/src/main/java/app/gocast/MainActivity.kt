@@ -13,15 +13,26 @@ import app.gocast.ui.ConnectScreen
 import app.gocast.ui.theme.GocastTheme
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        const val ACTION_RESUME_CAST = "app.gocast.action.RESUME_CAST"
+    }
+
     private var deepLinkUri by mutableStateOf<Uri?>(null)
+    private var resumeCastRequestId by mutableStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         deepLinkUri = intent?.data
+        if (intent?.action == ACTION_RESUME_CAST) {
+            resumeCastRequestId++
+        }
         setContent {
             GocastTheme {
-                ConnectScreen(deepLinkUri)
+                ConnectScreen(
+                    deepLinkUri = deepLinkUri,
+                    resumeCastRequestId = resumeCastRequestId,
+                )
             }
         }
     }
@@ -30,5 +41,8 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         deepLinkUri = intent.data
+        if (intent.action == ACTION_RESUME_CAST) {
+            resumeCastRequestId++
+        }
     }
 }

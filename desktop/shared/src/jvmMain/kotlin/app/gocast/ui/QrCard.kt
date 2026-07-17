@@ -3,7 +3,6 @@ package app.gocast.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -18,20 +17,27 @@ import app.gocast.domain.model.JoinSession
 import app.gocast.qr.QrCodeEncoder
 
 @Composable
-fun QrCard(session: JoinSession){
-    val qrBitmap = remember(session.joinUrl){
+fun QrCard(
+    session: JoinSession,
+    modifier: Modifier = Modifier,
+) {
+    val qrBitmap = remember(session.joinUrl) {
         QrCodeEncoder.encode(session.joinUrl)
     }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.padding(24.dp).fillMaxSize(),
-    ){
+        modifier = modifier.padding(24.dp),
+    ) {
+        Text(
+            text = "Scan to cast",
+            style = MaterialTheme.typography.titleMedium,
+        )
         Image(
             bitmap = qrBitmap,
             contentDescription = "QR code to join session",
-            modifier = Modifier.size(256.dp),
+            modifier = Modifier.padding(top = 16.dp).size(220.dp),
         )
         SelectionContainer {
             Text(

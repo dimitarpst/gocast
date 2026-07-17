@@ -27,6 +27,7 @@ ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref ="ktor" 
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing"}
 zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing" }
+compose-webview = { module = "io.github.kevinnzou:compose-webview-multiplatform", version = "2.0.1" }
 
 [plugins]
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

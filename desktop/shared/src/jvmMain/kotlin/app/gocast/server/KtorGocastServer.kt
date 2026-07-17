@@ -1,6 +1,7 @@
 package app.gocast.server
 
 import app.gocast.domain.model.HelloMessage
+import io.ktor.http.ContentType
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.engine.EmbeddedServer
@@ -22,16 +23,17 @@ import kotlin.time.Duration.Companion.seconds
 
 class KtorGocastServer : GocastServer {
 
-    companion object{
+    companion object {
         private const val GRACE_PERIOD_MILLIS = 1000L
         private const val TIMEOUT_MILLIS = 2000L
+        private val json = Json { ignoreUnknownKeys = true }
     }
 
     private var engine: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
     override val isRunning: Boolean get() = engine != null
 
     override suspend fun start(port: Int) {
-        if(isRunning) return
+        if (isRunning) return
 
         engine = embeddedServer(Netty, host = "0.0.0.0", port = port) {
             configureRouting()
@@ -44,7 +46,7 @@ class KtorGocastServer : GocastServer {
     }
 
     private fun Application.configureRouting() {
-        install(WebSockets){
+        install(WebSockets) {
             pingPeriod = 15.seconds
             timeout = 15.seconds
         }
@@ -52,19 +54,74 @@ class KtorGocastServer : GocastServer {
             get("/health") {
                 call.respondText("gocast ok")
             }
-            webSocket("/ws"){
-                for(frame in incoming){
-                    if(frame !is Frame.Text) continue
-
-                    val msg = Json.decodeFromString<HelloMessage>(frame.readText())
-
-                    if(msg.type == "hello" && msg.token == SessionGuard.expectedToken){
-                        send(Frame.Text("ok"))
-                    }else{
+            get("/view") {
+                val token = SessionGuard.expectedToken.orEmpty()
+                call.respondText(ViewerPage.html(token), ContentType.Text.Html)
+            }
+            webSocket("/ws") {
+                var role: String? = null
+                try {
+                    val first = incoming.receive() as? Frame.Text ?: run {
                         close()
+                        return@webSocket
+                    }
+                    val hello = json.decodeFromString<HelloMessage>(first.readText())
+                    if (hello.type != "hello" || hello.token != SessionGuard.expectedToken) {
+                        close()
+                        return@webSocket
+                    }
+
+                    role = hello.role
+                    when (role) {
+                        "phone" -> SignalingHub.setPhone(this)
+                        "viewer" -> {
+                            SignalingHub.setViewer(this)
+                            send(Frame.Text("ok"))
+                            SignalingHub.sendToPhone("""{"type":"viewer-ready"}""")
+                        }
+                        else -> {
+                            close()
+                            return@webSocket
+                        }
+                    }
+
+                    if (role == "phone") {
+                        send(Frame.Text("ok"))
+                    }
+
+                    for (frame in incoming) {
+                        if (frame !is Frame.Text) continue
+                        val text = frame.readText()
+                        when (role) {
+                            "phone" -> {
+                                val type = signalingType(text)
+                                if (type == "phone-media-ready") {
+                                    if (SignalingHub.hasViewer()) {
+                                        SignalingHub.sendToPhone("""{"type":"viewer-ready"}""")
+                                    }
+                                } else {
+                                    SignalingHub.sendToViewer(text)
+                                }
+                            }
+                            "viewer" -> SignalingHub.sendToPhone(text)
+                        }
+                    }
+                } finally {
+                    when (role) {
+                        "phone" -> SignalingHub.clearPhone(this)
+                        "viewer" -> SignalingHub.clearViewer(this)
                     }
                 }
             }
         }
     }
+
+    private fun signalingType(text: String): String? = try {
+        json.decodeFromString<SignalingTypeOnly>(text).type
+    } catch (_: Exception) {
+        null
+    }
 }
+
+@kotlinx.serialization.Serializable
+private data class SignalingTypeOnly(val type: String)

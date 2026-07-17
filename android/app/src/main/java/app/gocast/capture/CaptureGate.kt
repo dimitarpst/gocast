@@ -9,16 +9,21 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
-/** Once per session: Connected → tell UI to show the system capture dialog. */
+/** Connected → ask for capture consent (also used for resume after pause). */
 class CaptureGate {
 
-    private val _events = MutableSharedFlow<CastEvent>(extraBufferCapacity = 1)
+    // replay=1 so a resume tap that emits before Compose collects still fires consent.
+    private val _events = MutableSharedFlow<CastEvent>(
+        replay = 1,
+        extraBufferCapacity = 1,
+    )
     val events: SharedFlow<CastEvent> = _events.asSharedFlow()
 
     private var captureRequested = false
 
     fun reset() {
         captureRequested = false
+        _events.resetReplayCache()
     }
 
     suspend fun onConnectionState(state: ConnectionState) {
@@ -26,6 +31,11 @@ class CaptureGate {
             captureRequested = true
             _events.emit(CastEvent.RequestCaptureConsent)
         }
+    }
+
+    suspend fun requestConsentAgain() {
+        captureRequested = true
+        _events.emit(CastEvent.RequestCaptureConsent)
     }
 
     fun onConsentResult(context: Context, resultCode: Int, data: Intent?) {
