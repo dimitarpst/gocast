@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import app.gocast.network.CastConnection
+import app.gocast.settings.CastQualityStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -119,7 +120,8 @@ class CaptureService : Service() {
         val factory = session.peerConnectionFactory
         val track = session.videoTrack
         if (factory != null && track != null) {
-            publisher = WebRtcPublisher(factory, track, serviceScope).also { it.start() }
+            val quality = CastQualityStore.load(applicationContext)
+            publisher = WebRtcPublisher(factory, track, serviceScope, quality).also { it.start() }
         } else {
             Log.e(TAG, "Missing factory/track after capturer start")
         }

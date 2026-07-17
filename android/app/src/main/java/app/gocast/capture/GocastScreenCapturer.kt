@@ -7,7 +7,6 @@ import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.util.Log
 import android.view.Surface
 import org.webrtc.CapturerObserver
 import org.webrtc.SurfaceTextureHelper
@@ -24,6 +23,7 @@ import org.webrtc.VideoSink
 class GocastScreenCapturer(
     private val mediaProjectionPermissionResultData: Intent,
     private val mediaProjectionCallback: MediaProjection.Callback,
+    private val virtualDisplayDpi: Int = VIRTUAL_DISPLAY_DPI_DEFAULT,
 ) : VideoCapturer, VideoSink {
 
     private var width = 0
@@ -112,8 +112,7 @@ class GocastScreenCapturer(
 
         ThreadUtils.invokeAtFrontUninterruptibly(helper.handler) {
             helper.setTextureSize(w, h)
-            display.resize(w, h, VIRTUAL_DISPLAY_DPI)
-            Log.i(TAG, "VirtualDisplay resized to ${w}x${h}")
+            display.resize(w, h, virtualDisplayDpi)
         }
     }
 
@@ -132,7 +131,7 @@ class GocastScreenCapturer(
             "GocastScreenCapture",
             width,
             height,
-            VIRTUAL_DISPLAY_DPI,
+            virtualDisplayDpi,
             DISPLAY_FLAGS,
             Surface(helper.surfaceTexture),
             null,
@@ -147,10 +146,9 @@ class GocastScreenCapturer(
     }
 
     companion object {
-        private const val TAG = "GocastScreenCapturer"
         private const val DISPLAY_FLAGS =
             DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC or
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION
-        private const val VIRTUAL_DISPLAY_DPI = 400
+        const val VIRTUAL_DISPLAY_DPI_DEFAULT = 400
     }
 }

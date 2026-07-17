@@ -7,6 +7,8 @@ import android.media.projection.MediaProjection
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import app.gocast.settings.CastQualitySettings
+import app.gocast.settings.CastQualityStore
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
@@ -21,6 +23,7 @@ class ScreenCastSession(
     private val onProjectionStopped: (() -> Unit)? = null,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val quality: CastQualitySettings = CastQualityStore.load(appContext)
 
     private var eglBase: EglBase? = null
     private var factory: PeerConnectionFactory? = null
@@ -53,7 +56,11 @@ class ScreenCastSession(
 
         val pcFactory = PeerConnectionFactory.builder()
             .setVideoEncoderFactory(
-                DefaultVideoEncoderFactory(egl.eglBaseContext, true, true),
+                DefaultVideoEncoderFactory(
+                    egl.eglBaseContext,
+                    quality.enableIntelVp8Encoder,
+                    quality.enableH264HighProfile,
+                ),
             )
             .setVideoDecoderFactory(
                 DefaultVideoDecoderFactory(egl.eglBaseContext),
@@ -72,6 +79,7 @@ class ScreenCastSession(
                     mainHandler.post { applyCaptureSize(width, height) }
                 }
             },
+            virtualDisplayDpi = quality.virtualDisplayDpi,
         )
         capturer = screenCapturer
 
@@ -83,9 +91,10 @@ class ScreenCastSession(
 
         screenCapturer.initialize(helper, appContext, source.capturerObserver)
         val metrics = appContext.resources.displayMetrics
-        lastWidth = metrics.widthPixels
-        lastHeight = metrics.heightPixels
-        screenCapturer.startCapture(lastWidth, lastHeight, 30)
+        val sized = scaledSize(metrics.widthPixels, metrics.heightPixels)
+        lastWidth = sized.first
+        lastHeight = sized.second
+        screenCapturer.startCapture(lastWidth, lastHeight, quality.captureFps)
 
         val track = pcFactory.createVideoTrack("gocast_screen", source)
         track.setEnabled(true)
@@ -112,17 +121,23 @@ class ScreenCastSession(
 
     private fun applyCaptureSize(width: Int, height: Int) {
         if (stopping) return
-        val w = width / 2 * 2
-        val h = height / 2 * 2
+        val (w, h) = scaledSize(width, height)
         if (w <= 0 || h <= 0) return
         if (w == lastWidth && h == lastHeight) return
         lastWidth = w
         lastHeight = h
         try {
-            capturer?.changeCaptureFormat(w, h, 30)
+            capturer?.changeCaptureFormat(w, h, quality.captureFps)
         } catch (e: Exception) {
             Log.w(TAG, "changeCaptureFormat failed", e)
         }
+    }
+
+    private fun scaledSize(width: Int, height: Int): Pair<Int, Int> {
+        val scale = quality.resolutionScale.coerceIn(0.1f, 1.0f)
+        val w = ((width * scale).toInt() / 2) * 2
+        val h = ((height * scale).toInt() / 2) * 2
+        return w to h
     }
 
     fun stop(projectionAlreadyStopped: Boolean = false) {

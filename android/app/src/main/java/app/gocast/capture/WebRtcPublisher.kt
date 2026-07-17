@@ -5,6 +5,7 @@ import app.gocast.domain.ConnectionState
 import app.gocast.network.CastConnection
 import app.gocast.network.SignalingBridge
 import app.gocast.network.SignalingMessage
+import app.gocast.settings.CastQualitySettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -14,6 +15,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
+import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.RtpParameters
@@ -25,6 +27,7 @@ class WebRtcPublisher(
     private val factory: PeerConnectionFactory,
     private val videoTrack: VideoTrack,
     private val scope: CoroutineScope,
+    private val quality: CastQualitySettings,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private var peerConnection: PeerConnection? = null
@@ -166,7 +169,15 @@ class WebRtcPublisher(
         }
         peerConnection = pc
         pc.addTrack(videoTrack, listOf("gocast"))
+        applyCodecPreference(pc)
         applyVideoEncoding(pc)
+        // BWE start/min/max — without this WebRTC ramps up from ~300 kbps and
+        // the first seconds (or longer on stable links) look far worse than scrcpy.
+        pc.setBitrate(
+            quality.minBitrateBps.takeIf { it > 0 },
+            quality.startBitrateBps,
+            quality.maxBitrateBps,
+        )
 
         pc.createOffer(
             object : SdpObserver {
@@ -199,14 +210,62 @@ class WebRtcPublisher(
         )
     }
 
+    /** Put the preferred codec first in the offer so the hardware encoder is used. */
+    private fun applyCodecPreference(pc: PeerConnection) {
+        val wanted = quality.preferredCodec.name // matches SDP names: H264, H265, VP8, VP9, AV1
+        try {
+            val capabilities = factory.getRtpSenderCapabilities(
+                MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
+            )
+            val codecs = capabilities.codecs
+            if (codecs.none { it.name.equals(wanted, ignoreCase = true) }) {
+                Log.w(TAG, "Codec $wanted not in sender capabilities — keeping defaults")
+                return
+            }
+            val ordered = codecs.sortedByDescending { it.name.equals(wanted, ignoreCase = true) }
+            val transceiver = pc.transceivers.firstOrNull {
+                it.sender.track()?.id() == videoTrack.id()
+            }
+            if (transceiver == null) {
+                Log.w(TAG, "No video transceiver found for codec preference")
+                return
+            }
+            transceiver.setCodecPreferences(ordered)
+        } catch (e: Exception) {
+            Log.w(TAG, "setCodecPreferences failed — keeping defaults", e)
+        }
+    }
+
     private fun applyVideoEncoding(pc: PeerConnection) {
         val sender = pc.senders.firstOrNull { it.track()?.id() == videoTrack.id() } ?: return
         val params = sender.parameters
-        params.degradationPreference = RtpParameters.DegradationPreference.MAINTAIN_FRAMERATE
+        params.degradationPreference = when (quality.degradationPreference) {
+            CastQualitySettings.DegradationPreference.DISABLED ->
+                RtpParameters.DegradationPreference.DISABLED
+            CastQualitySettings.DegradationPreference.MAINTAIN_FRAMERATE ->
+                RtpParameters.DegradationPreference.MAINTAIN_FRAMERATE
+            CastQualitySettings.DegradationPreference.MAINTAIN_RESOLUTION ->
+                RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+            CastQualitySettings.DegradationPreference.BALANCED ->
+                RtpParameters.DegradationPreference.BALANCED
+        }
+        val networkPriority = when (quality.networkPriority) {
+            CastQualitySettings.NetworkPriority.VERY_LOW ->
+                org.webrtc.Priority.VERY_LOW
+            CastQualitySettings.NetworkPriority.LOW ->
+                org.webrtc.Priority.LOW
+            CastQualitySettings.NetworkPriority.MEDIUM ->
+                org.webrtc.Priority.MEDIUM
+            CastQualitySettings.NetworkPriority.HIGH ->
+                org.webrtc.Priority.HIGH
+        }
         for (encoding in params.encodings) {
-            encoding.maxBitrateBps = 4_000_000
-            encoding.minBitrateBps = 1_000_000
-            encoding.maxFramerate = 30
+            encoding.maxBitrateBps = quality.maxBitrateBps
+            encoding.minBitrateBps = quality.minBitrateBps
+            encoding.maxFramerate = quality.maxFramerate
+            encoding.scaleResolutionDownBy = quality.scaleResolutionDownBy
+            encoding.bitratePriority = quality.bitratePriority
+            encoding.networkPriority = networkPriority
         }
         sender.parameters = params
     }

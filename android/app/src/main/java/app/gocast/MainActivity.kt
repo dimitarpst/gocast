@@ -6,9 +6,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import app.gocast.ui.ConnectScreen
 import app.gocast.ui.theme.GocastTheme
 
@@ -29,10 +33,17 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             GocastTheme {
-                ConnectScreen(
-                    deepLinkUri = deepLinkUri,
-                    resumeCastRequestId = resumeCastRequestId,
-                )
+                // Without a Surface, Compose never paints the theme background —
+                // the window stays white regardless of dark mode.
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    ConnectScreen(
+                        deepLinkUri = deepLinkUri,
+                        resumeCastRequestId = resumeCastRequestId,
+                    )
+                }
             }
         }
     }
