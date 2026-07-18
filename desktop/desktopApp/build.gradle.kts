@@ -23,8 +23,18 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "app.gocast"
+            packageName = "gocast"
             packageVersion = "1.0.0"
+            // Source of truth: branding/gocast_logo_sm.png → icons/icon.*
+            windows {
+                iconFile.set(project.file("icons/icon.ico"))
+            }
+            linux {
+                iconFile.set(project.file("icons/icon.png"))
+            }
+            macOS {
+                iconFile.set(project.file("icons/icon.png"))
+            }
         }
 
         buildTypes.release.proguard {
