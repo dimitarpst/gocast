@@ -32,11 +32,22 @@ class SignalingSession(
             )
             val frame = ws.incoming.receive() as? Frame.Text
                 ?: return HelloResult.Failed("No response from PC").also { close() }
-            if (frame.readText() == "ok") {
-                HelloResult.Ok
-            } else {
-                close()
-                HelloResult.Failed("Server rejected token")
+            val text = frame.readText()
+            when {
+                text == "ok" -> HelloResult.Ok()
+                else -> {
+                    val ok = runCatching { json.decodeFromString<HelloOkMessage>(text) }.getOrNull()
+                    if (ok?.type == "ok") {
+                        HelloResult.Ok(
+                            trustToken = ok.trustToken,
+                            instanceId = ok.instanceId,
+                            displayName = ok.displayName,
+                        )
+                    } else {
+                        close()
+                        HelloResult.Failed("Server rejected token")
+                    }
+                }
             }
         } catch (_: java.net.ConnectException) {
             close()
@@ -47,9 +58,13 @@ class SignalingSession(
         }
     }
 
-    /** Keeps the socket alive: WS → bridge incoming, bridge outgoing → WS. */
-    suspend fun runMessageLoop() {
-        val ws = session ?: return
+    /**
+     * Keeps the socket alive until it drops or the PC ends the session.
+     * @return true if the PC sent session-ended (do not auto-reconnect).
+     */
+    suspend fun runMessageLoop(): Boolean {
+        val ws = session ?: return false
+        var endedByServer = false
         try {
             coroutineScope {
                 val outgoingJob = launch {
@@ -60,7 +75,12 @@ class SignalingSession(
                 try {
                     for (frame in ws.incoming) {
                         if (frame is Frame.Text) {
-                            SignalingBridge.receive(frame.readText())
+                            val text = frame.readText()
+                            if (isSessionEnded(text)) {
+                                endedByServer = true
+                                break
+                            }
+                            SignalingBridge.receive(text)
                         }
                     }
                 } finally {
@@ -70,10 +90,17 @@ class SignalingSession(
         } finally {
             close()
         }
+        return endedByServer
     }
 
     suspend fun close() {
         session?.close()
         session = null
+    }
+
+    private fun isSessionEnded(text: String): Boolean {
+        return runCatching {
+            json.decodeFromString<SignalingMessage>(text).type == "session-ended"
+        }.getOrDefault(false)
     }
 }

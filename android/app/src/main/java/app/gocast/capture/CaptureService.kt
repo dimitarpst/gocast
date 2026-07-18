@@ -65,6 +65,7 @@ class CaptureService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        CastConnection.bindAppContext(applicationContext)
         // Keep / restore phone↔PC signaling for the lifetime of this service
         // (including paused), independent of Activity / ViewModel.
         CastConnection.ensureConnected()

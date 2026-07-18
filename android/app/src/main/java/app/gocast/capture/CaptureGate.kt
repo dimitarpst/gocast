@@ -12,38 +12,45 @@ import kotlinx.coroutines.flow.asSharedFlow
 /** Connected → ask for capture consent (also used for resume after pause). */
 class CaptureGate {
 
-    // replay=1 so a resume tap that emits before Compose collects still fires consent.
     private val _events = MutableSharedFlow<CastEvent>(
-        replay = 1,
         extraBufferCapacity = 1,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST,
     )
     val events: SharedFlow<CastEvent> = _events.asSharedFlow()
 
     private var captureRequested = false
+    private var consentDialogPending = false
 
     fun reset() {
         captureRequested = false
-        _events.resetReplayCache()
+        consentDialogPending = false
     }
 
     suspend fun onConnectionState(state: ConnectionState) {
         if (state is ConnectionState.Connected && !captureRequested) {
             captureRequested = true
-            _events.emit(CastEvent.RequestCaptureConsent)
+            emitConsentOnce()
         }
     }
 
     suspend fun requestConsentAgain() {
         captureRequested = true
-        _events.emit(CastEvent.RequestCaptureConsent)
+        emitConsentOnce()
     }
 
     fun onConsentResult(context: Context, resultCode: Int, data: Intent?) {
+        consentDialogPending = false
         if (resultCode == Activity.RESULT_OK && data != null) {
             ProjectionPermissionHolder.set(resultCode, data)
             CaptureService.start(context)
         } else {
             reset()
         }
+    }
+
+    private suspend fun emitConsentOnce() {
+        if (consentDialogPending) return
+        consentDialogPending = true
+        _events.emit(CastEvent.RequestCaptureConsent)
     }
 }

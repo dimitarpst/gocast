@@ -1,10 +1,14 @@
 package app.gocast.network
 
+import android.content.Context
+import android.content.Intent
+import app.gocast.capture.CaptureService
 import app.gocast.domain.ConnectionState
 import app.gocast.domain.JoinParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -14,12 +18,31 @@ import kotlinx.coroutines.flow.StateFlow
 object CastConnection {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val connector = SessionConnector(scope)
+
+    @Volatile
+    private var appContext: Context? = null
+
+    private val connector = SessionConnector(
+        scope = scope,
+        onRemoteEnded = {
+            val ctx = appContext ?: return@SessionConnector
+            runCatching {
+                ctx.startService(
+                    Intent(ctx, CaptureService::class.java).setAction(CaptureService.ACTION_STOP),
+                )
+            }
+        },
+    )
 
     @Volatile
     private var lastParams: JoinParams? = null
 
     val state: StateFlow<ConnectionState> = connector.state
+    val paired: SharedFlow<PairedSession> = connector.paired
+
+    fun bindAppContext(context: Context) {
+        appContext = context.applicationContext
+    }
 
     fun start(params: JoinParams) {
         lastParams = params

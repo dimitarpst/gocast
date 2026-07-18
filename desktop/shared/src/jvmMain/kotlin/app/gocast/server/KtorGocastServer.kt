@@ -1,6 +1,8 @@
 package app.gocast.server
 
 import app.gocast.domain.model.HelloMessage
+import app.gocast.domain.model.HelloOkMessage
+import app.gocast.trust.DesktopIdentityStore
 import io.ktor.http.ContentType
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -10,6 +12,7 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
@@ -21,7 +24,9 @@ import io.ktor.websocket.readText
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
 
-class KtorGocastServer : GocastServer {
+class KtorGocastServer(
+    private val identityStore: DesktopIdentityStore = DesktopIdentityStore(),
+) : GocastServer {
 
     companion object {
         private const val GRACE_PERIOD_MILLIS = 1000L
@@ -58,6 +63,14 @@ class KtorGocastServer : GocastServer {
                 val token = SessionGuard.expectedToken.orEmpty()
                 call.respondText(ViewerPage.html(token), ContentType.Text.Html)
             }
+            post("/__gocast/disconnect") {
+                SignalingHub.disconnectPhone()
+                call.respondText("ok")
+            }
+            post("/__gocast/show-pairing") {
+                ViewerCommands.requestShowPairing()
+                call.respondText("ok")
+            }
             webSocket("/ws") {
                 var role: String? = null
                 try {
@@ -66,14 +79,23 @@ class KtorGocastServer : GocastServer {
                         return@webSocket
                     }
                     val hello = json.decodeFromString<HelloMessage>(first.readText())
-                    if (hello.type != "hello" || hello.token != SessionGuard.expectedToken) {
+                    if (hello.type != "hello" || !SessionGuard.isAuthorized(hello.token)) {
                         close()
                         return@webSocket
                     }
 
                     role = hello.role
                     when (role) {
-                        "phone" -> SignalingHub.setPhone(this)
+                        "phone" -> {
+                            SignalingHub.setPhone(this)
+                            val trustToken = resolveTrustToken(hello.token)
+                            val ok = HelloOkMessage(
+                                trustToken = trustToken,
+                                instanceId = SessionGuard.instanceId,
+                                displayName = SessionGuard.displayName,
+                            )
+                            send(Frame.Text(json.encodeToString(HelloOkMessage.serializer(), ok)))
+                        }
                         "viewer" -> {
                             SignalingHub.setViewer(this)
                             send(Frame.Text("ok"))
@@ -83,10 +105,6 @@ class KtorGocastServer : GocastServer {
                             close()
                             return@webSocket
                         }
-                    }
-
-                    if (role == "phone") {
-                        send(Frame.Text("ok"))
                     }
 
                     for (frame in incoming) {
@@ -114,6 +132,16 @@ class KtorGocastServer : GocastServer {
                 }
             }
         }
+    }
+
+    private fun resolveTrustToken(presentedToken: String): String {
+        if (!SessionGuard.isSessionCredential(presentedToken)) {
+            return presentedToken.trim()
+        }
+        val trust = identityStore.newTrustToken()
+        SessionGuard.addTrusted(trust)
+        identityStore.saveTrustedTokens(SessionGuard.trustedSnapshot())
+        return trust
     }
 
     private fun signalingType(text: String): String? = try {

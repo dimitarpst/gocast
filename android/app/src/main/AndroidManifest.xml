@@ -9,6 +9,7 @@
     <!-- Android 16 Live Updates: promoted ongoing notification (non-runtime permission) -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />

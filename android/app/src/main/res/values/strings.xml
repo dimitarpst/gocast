@@ -4,4 +4,19 @@
     <string name="scan_qr_hint">Point at the GoCast QR on your PC</string>
     <string name="scan_qr_invalid">Not a GoCast QR code</string>
     <string name="scan_qr_camera_denied">Camera permission is required to scan</string>
+    <string name="connect_idle">Connect to cast</string>
+    <string name="connecting">Connecting…</string>
+    <string name="connected">Connected!</string>
+    <string name="reconnecting">Reconnecting…</string>
+    <string name="find_on_wifi">Find on Wi‑Fi</string>
+    <string name="cast_to_pc">Cast to %1$s</string>
+    <string name="quality_settings">Quality settings</string>
+    <string name="stop_cast">Stop</string>
+    <string name="looking_for_pcs">Looking for GoCast on this Wi‑Fi…</string>
+    <string name="no_pcs_yet">No PCs found yet — is gocast open on your computer?</string>
+    <string name="back">Back</string>
+    <string name="enter_code">Enter code</string>
+    <string name="pairing_code">Pairing code</string>
+    <string name="code_too_short">Enter the 4-character code from your PC</string>
+    <string name="connect">Connect</string>
 </resources>

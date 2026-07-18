@@ -8,3 +8,11 @@ data class HelloMessage(
     val token: String,
     val role: String = "phone",
 )
+
+@Serializable
+data class HelloOkMessage(
+    val type: String = "ok",
+    val trustToken: String? = null,
+    val instanceId: String? = null,
+    val displayName: String? = null,
+)

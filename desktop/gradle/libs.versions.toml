@@ -7,6 +7,7 @@ kotlinx-coroutines = "1.11.0"
 material3 = "1.11.0-alpha07"
 ktor = "3.1.1"
 zxing = "3.5.3"
+jmdns = "3.6.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -28,6 +29,7 @@ ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.re
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing"}
 zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing" }
 compose-webview = { module = "io.github.kevinnzou:compose-webview-multiplatform", version = "2.0.1" }
+jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
 
 [plugins]
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

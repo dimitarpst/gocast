@@ -42,20 +42,100 @@ object ViewerPage {
       background: rgba(0,0,0,0.45);
       padding: 4px 8px;
       border-radius: 4px;
+      pointer-events: none;
     }
+    #fab {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 10;
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(27, 32, 48, 0.88);
+      color: #e8ecf5;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.45);
+    }
+    #fab:hover { background: rgba(42, 49, 66, 0.95); }
+    #menu {
+      display: none;
+      position: absolute;
+      top: 60px;
+      left: 14px;
+      z-index: 11;
+      min-width: 200px;
+      padding: 6px;
+      border-radius: 12px;
+      background: rgba(27, 32, 48, 0.96);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    #menu.open { display: block; }
+    #menu button {
+      display: block;
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: #e8ecf5;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #menu button:hover { background: rgba(255,255,255,0.08); }
   </style>
 </head>
 <body>
   <div id="wrap">
     <video id="video" autoplay playsinline muted></video>
     <div id="status">Connecting…</div>
+    <button id="fab" type="button" aria-label="Menu" title="Menu">☰</button>
+    <div id="menu" role="menu">
+      <button type="button" id="btn-retry">Screen stuck? Retry</button>
+      <button type="button" id="btn-pairing">Show pairing again</button>
+      <button type="button" id="btn-disconnect">Disconnect</button>
+    </div>
   </div>
   <script>
     const TOKEN = ${token.toJsonString()};
     const statusEl = document.getElementById('status');
     const video = document.getElementById('video');
+    const fab = document.getElementById('fab');
+    const menu = document.getElementById('menu');
 
     function setStatus(text) { statusEl.textContent = text; }
+
+    async function postAction(path) {
+      try {
+        await fetch(path, { method: 'POST', cache: 'no-store' });
+      } catch (e) {
+        console.warn('action failed', path, e);
+      }
+    }
+
+    fab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      menu.classList.toggle('open');
+    });
+    document.addEventListener('click', () => menu.classList.remove('open'));
+    menu.addEventListener('click', (e) => e.stopPropagation());
+
+    document.getElementById('btn-retry').addEventListener('click', () => {
+      menu.classList.remove('open');
+      location.reload();
+    });
+    document.getElementById('btn-pairing').addEventListener('click', () => {
+      menu.classList.remove('open');
+      postAction('/__gocast/show-pairing');
+    });
+    document.getElementById('btn-disconnect').addEventListener('click', () => {
+      menu.classList.remove('open');
+      postAction('/__gocast/disconnect');
+    });
 
     let pc = null;
 
@@ -103,7 +183,6 @@ object ViewerPage {
       try { msg = JSON.parse(text); } catch (_) { return; }
 
       if (msg.type === 'offer' && msg.sdp) {
-        // Phone always builds a fresh PeerConnection per offer — mirror it.
         wirePeerConnection();
         await pc.setRemoteDescription({ type: 'offer', sdp: msg.sdp });
         const answer = await pc.createAnswer();
