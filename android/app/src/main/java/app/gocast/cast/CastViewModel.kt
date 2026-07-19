@@ -20,9 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 class CastViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -85,22 +83,15 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
     fun castToTrustedPc() {
         if (_joinBusy.value || castTrustedJob?.isActive == true) return
         if (!canStartJoin()) return
-        val pc = _trustedPc.value ?: return
+        if (_trustedPc.value == null) return
         _joinBusy.value = true
         castTrustedJob = viewModelScope.launch {
             try {
-                val refreshed = withTimeoutOrNull(2_500) {
-                    discovery.discover().first { hosts ->
-                        hosts.any { it.instanceId == pc.instanceId }
-                    }.first { it.instanceId == pc.instanceId }
-                }
-                val host = refreshed?.host ?: pc.host
-                val port = refreshed?.port ?: pc.port
-                if (refreshed != null && (refreshed.host != pc.host || refreshed.port != pc.port)) {
-                    trustedStore.save(pc.copy(host = host, port = port))
-                    _trustedPc.value = pc.copy(host = host, port = port)
-                }
-                startJoin(JoinParams(host = host, port = port, token = pc.trustToken))
+                val resolved = TrustedCastResolver.resolveTrustedJoin(getApplication())
+                    ?: return@launch
+                val (pc, params) = resolved
+                _trustedPc.value = pc
+                startJoin(params)
             } finally {
                 _joinBusy.value = false
             }

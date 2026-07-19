@@ -27,6 +27,7 @@ class CaptureGate {
     }
 
     suspend fun onConnectionState(state: ConnectionState) {
+        if (suppressAutoConsent) return
         if (state is ConnectionState.Connected && !captureRequested) {
             captureRequested = true
             emitConsentOnce()
@@ -49,8 +50,15 @@ class CaptureGate {
     }
 
     private suspend fun emitConsentOnce() {
+        if (suppressAutoConsent) return
         if (consentDialogPending) return
         consentDialogPending = true
         _events.emit(CastEvent.RequestCaptureConsent)
+    }
+
+    companion object {
+        /** When Quick Cast owns consent, ViewModel must not also pop the dialog. */
+        @Volatile
+        var suppressAutoConsent: Boolean = false
     }
 }

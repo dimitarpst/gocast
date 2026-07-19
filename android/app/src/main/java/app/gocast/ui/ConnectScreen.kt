@@ -44,7 +44,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.gocast.R
 import app.gocast.capture.CaptureConsent
@@ -128,15 +131,19 @@ fun ConnectScreen(
         }
     }
 
-    // Keep collectors alive even on Quality settings so Resume always works.
-    LaunchedEffect(viewModel) {
-        viewModel.events.collect { event ->
-            when (event) {
-                CastEvent.RequestCaptureConsent -> {
-                    if (Build.VERSION.SDK_INT >= 33) {
-                        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Only while resumed — Quick Cast owns consent when the app is in the background.
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            viewModel.events.collect { event ->
+                when (event) {
+                    CastEvent.RequestCaptureConsent -> {
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        captureLauncher.launch(CaptureConsent.createIntent(context))
                     }
-                    captureLauncher.launch(CaptureConsent.createIntent(context))
                 }
             }
         }

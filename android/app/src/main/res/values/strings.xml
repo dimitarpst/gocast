@@ -17,8 +17,11 @@
     <string name="other_ways">Or connect another way</string>
     <string name="quality_settings">Quality settings</string>
     <string name="quality_live_hint">Tweaking quality while casting applies in real time.</string>
+    <string name="tile_label">Cast</string>
     <string name="tile_idle">Open gocast</string>
+    <string name="tile_quick_cast">Cast to PC</string>
     <string name="tile_casting">Tap to stop</string>
+    <string name="tile_pc_unavailable">Couldn’t reach your last PC</string>
     <string name="stop_cast">Stop casting</string>
     <string name="looking_for_pcs">Looking for GoCast on this Wi‑Fi…</string>
     <string name="no_pcs_yet">No PCs found yet — is gocast open on your computer?</string>
