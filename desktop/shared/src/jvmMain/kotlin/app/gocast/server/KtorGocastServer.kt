@@ -40,7 +40,8 @@ class KtorGocastServer(
     override suspend fun start(port: Int) {
         if (isRunning) return
 
-        engine = embeddedServer(Netty, host = "0.0.0.0", port = port) {
+        // Dual-stack: IPv6 any (::) also accepts IPv4-mapped where the OS allows it.
+        engine = embeddedServer(Netty, host = "::", port = port) {
             configureRouting()
         }.start(wait = false)
     }

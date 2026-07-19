@@ -32,7 +32,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.gocast.discovery.GocastAdvertiser
 import app.gocast.domain.model.JoinSession
+import app.gocast.server.SessionGuard
+import app.gocast.trust.DesktopIdentityStore
 import app.gocast.ui.BrandHeader
 import dev.datlag.kcef.KCEF
 import kotlinx.coroutines.Dispatchers
@@ -41,11 +44,16 @@ import java.io.File
 import kotlin.math.max
 
 @Composable
-fun GocastRoot(session: JoinSession) {
+fun GocastRoot(
+    session: JoinSession,
+    identityStore: DesktopIdentityStore,
+    advertiser: GocastAdvertiser,
+) {
     var kcefReady by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0f) }
     var restartRequired by remember { mutableStateOf(false) }
     var initError by remember { mutableStateOf<String?>(null) }
+    var displayName by remember { mutableStateOf(session.displayName) }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -97,7 +105,16 @@ fun GocastRoot(session: JoinSession) {
             !kcefReady -> {
                 ViewerLoadingScreen(progressPercent = downloadProgress)
             }
-            else -> App(session)
+            else -> App(
+                session = session,
+                displayName = displayName,
+                onRename = { next ->
+                    val updated = identityStore.updateDisplayName(next)
+                    displayName = updated.displayName
+                    SessionGuard.displayName = updated.displayName
+                    advertiser.start(session.port, session.instanceId, updated.displayName)
+                },
+            )
         }
     }
 }

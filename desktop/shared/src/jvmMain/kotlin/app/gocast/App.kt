@@ -28,7 +28,11 @@ import app.gocast.ui.PairingScreen
 import app.gocast.ui.ViewerPane
 
 @Composable
-fun App(session: JoinSession) {
+fun App(
+    session: JoinSession,
+    displayName: String,
+    onRename: (String) -> Unit,
+) {
     val phoneConnected by SignalingHub.phoneConnected.collectAsState()
     var showPairing by remember { mutableStateOf(true) }
 
@@ -49,7 +53,11 @@ fun App(session: JoinSession) {
                 .background(Color(0xFF12141A)),
         ) {
             if (showPairing) {
-                PairingScreen(session = session)
+                PairingScreen(
+                    session = session,
+                    displayName = displayName,
+                    onRename = onRename,
+                )
                 if (phoneConnected) {
                     Text(
                         text = "Back to cast",

@@ -26,6 +26,15 @@ class DesktopIdentityStore(
         return createAndPersistIdentity()
     }
 
+    fun updateDisplayName(displayName: String): DesktopIdentity {
+        val cleaned = displayName.trim().ifBlank { "GoCast PC" }
+        val current = loadOrCreateIdentity()
+        val updated = current.copy(displayName = cleaned.take(48))
+        dir.createDirectories()
+        identityFile.writeText(json.encodeToString(DesktopIdentity.serializer(), updated))
+        return updated
+    }
+
     fun loadTrustedTokens(): Set<String> {
         if (!trustedFile.exists()) return emptySet()
         return runCatching {

@@ -6,8 +6,8 @@ kotlin = "2.4.0"
 kotlinx-coroutines = "1.11.0"
 material3 = "1.11.0-alpha07"
 ktor = "3.1.1"
-zxing = "3.5.3"
 jmdns = "3.6.2"
+qrcodegen = "1.8.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -26,8 +26,7 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref ="ktor" }
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
-zxing-core = { module = "com.google.zxing:core", version.ref = "zxing"}
-zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing" }
+qrcodegen = { module = "io.nayuki:qrcodegen", version.ref = "qrcodegen" }
 compose-webview = { module = "io.github.kevinnzou:compose-webview-multiplatform", version = "2.0.1" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
 

@@ -53,7 +53,11 @@ fun main() {
                     window.iconImages = awtIcons
                 }
             }
-            GocastRoot(session)
+            GocastRoot(
+                session = session,
+                identityStore = identityStore,
+                advertiser = advertiser,
+            )
         }
     }
 }

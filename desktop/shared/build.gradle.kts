@@ -25,8 +25,7 @@ kotlin {
         jvmMain.dependencies{
             implementation(libs.ktor.server.core)
             implementation(libs.ktor.server.netty)
-            implementation(libs.zxing.core)
-            implementation(libs.zxing.javase)
+            implementation(libs.qrcodegen)
             implementation(libs.ktor.server.websockets)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.compose.webview)

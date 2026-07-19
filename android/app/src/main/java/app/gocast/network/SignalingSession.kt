@@ -23,7 +23,7 @@ class SignalingSession(
     suspend fun open(host: String, port: Int, token: String): HelloResult {
         close()
         return try {
-            val ws = httpClient.webSocketSession("ws://$host:$port/ws")
+            val ws = httpClient.webSocketSession("ws://${HostEndpoint.authority(host, port)}/ws")
             session = ws
             ws.send(
                 Frame.Text(

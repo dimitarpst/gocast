@@ -9,5 +9,9 @@ data class JoinSession(
     val displayName: String,
 ) {
     val joinUrl: String
-        get() = "https://cast.govrse.app/join?a=$host:$port&t=$token"
+        get() {
+            val authority = if (host.contains(':')) "[$host]:$port" else "$host:$port"
+            // Prefer shortCode over the UUID token so the QR stays low-version (large dots).
+            return "https://cast.govrse.app/join?a=$authority&t=$shortCode"
+        }
 }
