@@ -34,7 +34,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
@@ -45,6 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gocast.domain.model.JoinSession
 import app.gocast.qr.QrCodeEncoder
+
+private val PairingFieldShape = RoundedCornerShape(8.dp)
+private val FieldBorder = Color(0xFF2A3142)
+private val FieldText = Color(0xFFE8ECF5)
+private val FieldMuted = Color(0xFF7E8798)
+private val BrandBlue = Color(0xFF6EA8FE)
 
 @Composable
 fun PairingScreen(
@@ -85,6 +90,7 @@ fun PairingScreen(
                 value = draftName,
                 onValueChange = { draftName = it.take(48) },
                 singleLine = true,
+                shape = PairingFieldShape,
                 label = { Text("This PC") },
                 trailingIcon = {
                     EditGlyph(
@@ -100,15 +106,15 @@ fun PairingScreen(
                     },
                 ),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color(0xFFE8ECF5),
-                    unfocusedTextColor = Color(0xFFE8ECF5),
-                    cursorColor = Color(0xFF6EA8FE),
-                    focusedBorderColor = Color(0xFF6EA8FE),
-                    unfocusedBorderColor = Color(0xFF2A3142),
+                    focusedTextColor = FieldText,
+                    unfocusedTextColor = FieldText,
+                    cursorColor = BrandBlue,
+                    focusedBorderColor = BrandBlue,
+                    unfocusedBorderColor = FieldBorder,
                     focusedLabelColor = Color(0xFF9AA3B5),
-                    unfocusedLabelColor = Color(0xFF7E8798),
+                    unfocusedLabelColor = FieldMuted,
                     focusedTrailingIconColor = Color(0xFF9AA3B5),
-                    unfocusedTrailingIconColor = Color(0xFF7E8798),
+                    unfocusedTrailingIconColor = FieldMuted,
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
                 ),
@@ -141,7 +147,7 @@ fun PairingScreen(
     }
 }
 
-/** Short code as a clear alternate join path — soft brand frame, not plain text. */
+/** Short code styled like the rename field — quiet outline, same corner radius. */
 @Composable
 private fun PairingCodeHighlight(
     code: String,
@@ -154,37 +160,33 @@ private fun PairingCodeHighlight(
     ) {
         Text(
             text = "Or enter code",
-            color = Color(0xFF7E8798),
-            fontSize = 13.sp,
+            color = FieldMuted,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            letterSpacing = 1.2.sp,
+            letterSpacing = 0.6.sp,
         )
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0x1473ACFE))
-                .border(
-                    width = 1.dp,
-                    color = Color(0x5573ACFE),
-                    shape = RoundedCornerShape(16.dp),
-                )
-                .padding(horizontal = 28.dp, vertical = 12.dp),
+                .clip(PairingFieldShape)
+                .border(width = 1.dp, color = FieldBorder, shape = PairingFieldShape)
+                .padding(horizontal = 24.dp, vertical = 14.dp),
         ) {
             Text(
                 text = formatted,
-                color = Color(0xFFE8ECF5),
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Bold,
+                color = FieldText,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.SemiBold,
                 fontFamily = FontFamily.Monospace,
-                letterSpacing = 6.sp,
+                letterSpacing = 4.sp,
                 textAlign = TextAlign.Center,
             )
         }
     }
 }
 
+/** Classic pencil/edit mark — filled body + tip, readable at 18dp. */
 @Composable
 private fun EditGlyph(
     tint: Color,
@@ -192,30 +194,40 @@ private fun EditGlyph(
 ) {
     Canvas(modifier = modifier) {
         val w = size.minDimension
-        val stroke = Stroke(width = w * 0.11f, cap = StrokeCap.Round)
-        // Pencil body
-        val path = Path().apply {
-            moveTo(w * 0.22f, w * 0.72f)
-            lineTo(w * 0.68f, w * 0.26f)
-            lineTo(w * 0.78f, w * 0.36f)
-            lineTo(w * 0.32f, w * 0.82f)
+        // Shaft (parallelogram)
+        val shaft = Path().apply {
+            moveTo(w * 0.28f, w * 0.72f)
+            lineTo(w * 0.68f, w * 0.32f)
+            lineTo(w * 0.78f, w * 0.42f)
+            lineTo(w * 0.38f, w * 0.82f)
             close()
         }
-        drawPath(path, color = tint, style = stroke)
+        drawPath(shaft, color = tint)
+
         // Tip
+        val tip = Path().apply {
+            moveTo(w * 0.28f, w * 0.72f)
+            lineTo(w * 0.14f, w * 0.86f)
+            lineTo(w * 0.38f, w * 0.82f)
+            close()
+        }
+        drawPath(tip, color = tint)
+
+        // Eraser end band
         drawLine(
             color = tint,
-            start = Offset(w * 0.18f, w * 0.78f),
-            end = Offset(w * 0.28f, w * 0.88f),
-            strokeWidth = w * 0.11f,
+            start = Offset(w * 0.62f, w * 0.26f),
+            end = Offset(w * 0.74f, w * 0.38f),
+            strokeWidth = w * 0.10f,
             cap = StrokeCap.Round,
         )
-        // Cap line
+
+        // Lead notch on tip (cuts into fill for definition)
         drawLine(
-            color = tint,
-            start = Offset(w * 0.58f, w * 0.22f),
-            end = Offset(w * 0.72f, w * 0.36f),
-            strokeWidth = w * 0.11f,
+            color = Color(0xFF12141A),
+            start = Offset(w * 0.22f, w * 0.78f),
+            end = Offset(w * 0.18f, w * 0.82f),
+            strokeWidth = w * 0.06f,
             cap = StrokeCap.Round,
         )
     }

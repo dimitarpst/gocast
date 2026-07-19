@@ -39,7 +39,11 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
     private val _discoveredHosts = MutableStateFlow<List<DiscoveredHost>>(emptyList())
     val discoveredHosts: StateFlow<List<DiscoveredHost>> = _discoveredHosts.asStateFlow()
 
+    private val _joinBusy = MutableStateFlow(false)
+    val joinBusy: StateFlow<Boolean> = _joinBusy.asStateFlow()
+
     private var discoveryJob: Job? = null
+    private var castTrustedJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -71,6 +75,7 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startJoin(params: JoinParams) {
+        if (!canStartJoin()) return
         captureGate.reset()
         CastConnection.bindAppContext(getApplication())
         CastConnection.start(params)
@@ -78,20 +83,39 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
 
     /** One-tap: try last host, refresh IP via discovery if needed. */
     fun castToTrustedPc() {
+        if (_joinBusy.value || castTrustedJob?.isActive == true) return
+        if (!canStartJoin()) return
         val pc = _trustedPc.value ?: return
-        viewModelScope.launch {
-            val refreshed = withTimeoutOrNull(2_500) {
-                discovery.discover().first { hosts ->
-                    hosts.any { it.instanceId == pc.instanceId }
-                }.first { it.instanceId == pc.instanceId }
+        _joinBusy.value = true
+        castTrustedJob = viewModelScope.launch {
+            try {
+                val refreshed = withTimeoutOrNull(2_500) {
+                    discovery.discover().first { hosts ->
+                        hosts.any { it.instanceId == pc.instanceId }
+                    }.first { it.instanceId == pc.instanceId }
+                }
+                val host = refreshed?.host ?: pc.host
+                val port = refreshed?.port ?: pc.port
+                if (refreshed != null && (refreshed.host != pc.host || refreshed.port != pc.port)) {
+                    trustedStore.save(pc.copy(host = host, port = port))
+                    _trustedPc.value = pc.copy(host = host, port = port)
+                }
+                startJoin(JoinParams(host = host, port = port, token = pc.trustToken))
+            } finally {
+                _joinBusy.value = false
             }
-            val host = refreshed?.host ?: pc.host
-            val port = refreshed?.port ?: pc.port
-            if (refreshed != null && (refreshed.host != pc.host || refreshed.port != pc.port)) {
-                trustedStore.save(pc.copy(host = host, port = port))
-                _trustedPc.value = pc.copy(host = host, port = port)
-            }
-            startJoin(JoinParams(host = host, port = port, token = pc.trustToken))
+        }
+    }
+
+    private fun canStartJoin(): Boolean {
+        return when (connectionState.value) {
+            is ConnectionState.Idle,
+            is ConnectionState.Failed,
+            -> true
+            is ConnectionState.Connecting,
+            is ConnectionState.Connected,
+            is ConnectionState.Reconnecting,
+            -> false
         }
     }
 
@@ -123,6 +147,9 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Same as notification Stop — end capture and drop the PC link. */
     fun stopCast() {
+        castTrustedJob?.cancel()
+        castTrustedJob = null
+        _joinBusy.value = false
         val context = getApplication<Application>()
         runCatching {
             context.startService(
