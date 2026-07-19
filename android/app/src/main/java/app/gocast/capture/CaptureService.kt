@@ -13,6 +13,7 @@ import app.gocast.network.CastConnection
 import app.gocast.settings.CastQualityDiff
 import app.gocast.settings.CastQualitySettings
 import app.gocast.settings.CastQualityStore
+import app.gocast.tile.GocastTileService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +31,13 @@ class CaptureService : Service() {
 
         @Volatile
         private var mediaActive = false
+
+        fun isMediaActive(): Boolean = mediaActive
+
+        private fun setMediaActive(context: Context, active: Boolean) {
+            mediaActive = active
+            GocastTileService.requestUpdate(context)
+        }
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(
@@ -176,7 +184,7 @@ class CaptureService : Service() {
 
         publisher = WebRtcPublisher(factory, track, serviceScope, next).also { it.start() }
         appliedQuality = next
-        mediaActive = true
+        setMediaActive(applicationContext, true)
         showForegroundNotification()
     }
 
@@ -215,7 +223,7 @@ class CaptureService : Service() {
             val quality = CastQualityStore.load(applicationContext)
             appliedQuality = quality
             publisher = WebRtcPublisher(factory, track, serviceScope, quality).also { it.start() }
-            mediaActive = true
+            setMediaActive(applicationContext, true)
         } else {
             Log.e(TAG, "Missing factory/track after capturer start")
         }
@@ -241,7 +249,7 @@ class CaptureService : Service() {
     }
 
     override fun onDestroy() {
-        mediaActive = false
+        setMediaActive(applicationContext, false)
         publisher?.stop()
         screenCast?.stop(projectionAlreadyStopped = true)
         publisher = null
@@ -269,7 +277,7 @@ class CaptureService : Service() {
         val session = screenCast
         publisher = null
         screenCast = null
-        mediaActive = false
+        setMediaActive(applicationContext, false)
         releaseCastWakeLock()
 
         pub?.stop()
