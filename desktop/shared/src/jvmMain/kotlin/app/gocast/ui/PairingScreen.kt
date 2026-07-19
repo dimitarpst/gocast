@@ -42,6 +42,8 @@ fun PairingScreen(
             .background(Color(0xFF12141A))
             .padding(32.dp),
     ) {
+        BrandHeader(logoHeight = 52.dp)
+        Spacer(Modifier.height(28.dp))
         Text(
             text = "Scan to cast",
             color = Color(0xFFE8ECF5),

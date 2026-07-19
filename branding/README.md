@@ -4,7 +4,9 @@ Canonical logo sources for gocast (and later govrse).
 
 | File | Use |
 |------|-----|
-| `gocast_logo.png` | Full wordmark (in-app / marketing later) |
+| `gocast_logo.svg` | Full wordmark (in-app) |
+| `gocast_logo.png` | Full wordmark raster (marketing / export) |
+| `gocast_logo_sm.svg` | Compact mark |
 | `gocast_logo_sm.png` | Compact mark → app icons |
 
 Generated platform icons (from `gocast_logo_sm.png`):

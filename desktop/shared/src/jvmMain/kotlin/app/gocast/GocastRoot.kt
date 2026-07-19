@@ -30,10 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gocast.domain.model.JoinSession
+import app.gocast.ui.BrandHeader
 import dev.datlag.kcef.KCEF
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -128,13 +128,8 @@ private fun ViewerLoadingScreen(progressPercent: Float) {
                 .widthIn(max = 420.dp)
                 .padding(32.dp),
         ) {
-            Text(
-                text = "gocast",
-                color = Color(0xFFE8ECF5),
-                fontSize = 34.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(10.dp))
+            BrandHeader(logoHeight = 44.dp)
+            Spacer(Modifier.height(16.dp))
             Text(
                 text = "Preparing built-in viewer",
                 color = Color(0xFF9AA3B5),
