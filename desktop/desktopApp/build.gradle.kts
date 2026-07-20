@@ -25,7 +25,7 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "gocast"
             packageVersion = "1.0.0"
-            // Source of truth: branding/gocast_logo_sm.png → icons/icon.*
+            // Packaging icons only (runtime window icons live in src/main/resources/icon_*.png).
             windows {
                 iconFile.set(project.file("icons/icon.ico"))
             }

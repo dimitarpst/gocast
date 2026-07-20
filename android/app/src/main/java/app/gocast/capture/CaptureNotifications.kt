@@ -6,14 +6,15 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
 import app.gocast.MainActivity
+import app.gocast.R
 
 /**
- * Android 16 (SDK 36) Live Update: a "promoted ongoing" notification. Normal layout
- * (title/text/actions, no call UI, no media scrubber), pinned at the top of the shade
- * with a status-bar chip. Some OEMs (HyperOS) still allow swiping; deleteIntent
- * re-posts via CaptureService so a swipe never kills the cast.
+ * Android 16 Live Update (promoted ongoing). Avoid custom RemoteViews, setColorized,
+ * or dropping setRequestPromotedOngoing — those break notch-chip promotion.
+ * Do not setColor() a light brand blue: OEMs force a black small-icon glyph for contrast.
  */
 object CaptureNotifications {
 
@@ -37,29 +38,55 @@ object CaptureNotifications {
     }
 
     fun casting(context: Context): Notification =
-        base(context, "Casting screen", chip = "Casting")
+        base(
+            context = context,
+            text = context.getString(R.string.notif_casting_text),
+            chip = context.getString(R.string.notif_chip_casting),
+        )
             .setContentIntent(openAppPendingIntent(context))
-            .addAction(0, "Stop", stopPendingIntent(context))
+            .addAction(
+                0,
+                context.getString(R.string.notif_action_stop),
+                stopPendingIntent(context),
+            )
             .setDeleteIntent(dismissedPendingIntent(context))
             .build()
 
     fun paused(context: Context): Notification =
-        base(context, "Cast paused — tap to resume", chip = "Paused")
+        base(
+            context = context,
+            text = context.getString(R.string.notif_paused_text),
+            chip = context.getString(R.string.notif_chip_paused),
+        )
             .setContentIntent(resumePendingIntent(context))
-            .addAction(0, "Resume", resumePendingIntent(context))
-            .addAction(0, "Stop", stopPendingIntent(context))
+            .addAction(
+                0,
+                context.getString(R.string.notif_action_resume),
+                resumePendingIntent(context),
+            )
+            .addAction(
+                0,
+                context.getString(R.string.notif_action_stop),
+                stopPendingIntent(context),
+            )
             .setDeleteIntent(dismissedPendingIntent(context))
             .build()
 
     private fun base(context: Context, text: String, chip: String): NotificationCompat.Builder {
         ensureChannel(context)
+        val largeIcon = BitmapFactory.decodeResource(
+            context.resources,
+            R.drawable.ic_notification_gocast,
+        )
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("gocast")
+            .setContentTitle(context.getString(R.string.notif_casting_title))
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_share)
+            .setSmallIcon(R.drawable.ic_stat_gocast)
+            .setLargeIcon(largeIcon)
             .setOngoing(true)
             .setRequestPromotedOngoing(true)
             .setShortCriticalText(chip)
+            .setShowWhen(false)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)

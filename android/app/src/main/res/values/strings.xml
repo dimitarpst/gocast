@@ -31,4 +31,11 @@
     <string name="pairing_code">Pairing code</string>
     <string name="code_too_short">Enter the 4-character code from your PC</string>
     <string name="connect">Connect</string>
+    <string name="notif_casting_title">gocast</string>
+    <string name="notif_casting_text">Casting your screen</string>
+    <string name="notif_paused_text">Cast paused — tap to resume</string>
+    <string name="notif_chip_casting">Casting</string>
+    <string name="notif_chip_paused">Paused</string>
+    <string name="notif_action_stop">Stop</string>
+    <string name="notif_action_resume">Resume</string>
 </resources>
