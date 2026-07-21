@@ -8,6 +8,10 @@ desktop/desktopApp/kcef-cache/
 **/kcef-bundle/
 **/kcef-cache/
 
+# IDE (machine-local; do not commit)
+.idea/
+**/.idea/
+
 # Accidental WebRTC AAR extracts (not project source)
 .tmp-webrtc-src/
 **/.tmp-webrtc-src/
