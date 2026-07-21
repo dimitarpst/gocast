@@ -91,8 +91,9 @@ fun LastConnectedCard(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
                     )
                     Text(
                         text = if (busy) {
