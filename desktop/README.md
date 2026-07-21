@@ -12,7 +12,15 @@ Gradle/Java runs do **not** reliably show the Windows Firewall Allow popup. That
 
 ## Package Windows MSI
 
-Requires JDK 17+ with `jpackage`, and [WiX Toolset](https://wixtoolset.org/) on `PATH`.
+Requires JDK 17+ with `jpackage`, and **WiX Toolset 3.x** (`candle`/`light` on `PATH`).
+
+Install (admin PowerShell / elevated winget; needs .NET Framework 3.5):
+
+```bash
+winget install --id WiXToolset.WiXToolset -e
+```
+
+Then:
 
 ```bash
 ./gradlew :desktopApp:packageMsi

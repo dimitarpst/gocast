@@ -57,6 +57,15 @@ cd android
 ./gradlew :app:installDebug
 ```
 
+Release APK (needs local `keystore.properties` — see `keystore.properties.example`):
+
+```bash
+cd android
+./gradlew :app:assembleRelease
+```
+
+Output: `app/build/outputs/apk/release/app-release.apk`
+
 ## License
 
 [MIT](LICENSE)
