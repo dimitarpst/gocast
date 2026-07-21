@@ -10,11 +10,11 @@ import androidx.compose.runtime.setValue
 import app.gocast.discovery.GocastAdvertiser
 import app.gocast.domain.model.JoinSession
 import app.gocast.network.LanHostMonitor
-import app.gocast.platform.WebView2Support
 import app.gocast.platform.WindowsLanAccess
 import app.gocast.server.SessionGuard
 import app.gocast.trust.DesktopIdentityStore
 import app.gocast.ui.LanSetupScreen
+import java.awt.Window
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,6 +26,7 @@ fun GocastRoot(
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onExitFullscreen: () -> Unit,
+    ownerWindow: Window,
 ) {
     var displayName by remember { mutableStateOf(session.displayName) }
     var liveSession by remember { mutableStateOf(session) }
@@ -51,10 +52,6 @@ fun GocastRoot(
         }
     }
 
-    LaunchedEffect(Unit) {
-        WebView2Support.prepareProcessEnvironment()
-    }
-
     MaterialTheme {
         if (!lanReady) {
             LanSetupScreen(onReady = { lanReady = true })
@@ -76,6 +73,7 @@ fun GocastRoot(
                 isFullscreen = isFullscreen,
                 onToggleFullscreen = onToggleFullscreen,
                 onExitFullscreen = onExitFullscreen,
+                ownerWindow = ownerWindow,
             )
         }
     }

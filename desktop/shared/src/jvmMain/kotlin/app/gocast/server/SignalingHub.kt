@@ -18,6 +18,13 @@ object SignalingHub {
     private val _phoneConnected = MutableStateFlow(false)
     val phoneConnected: StateFlow<Boolean> = _phoneConnected.asStateFlow()
 
+    /**
+     * True once cast media is starting (phone-media-ready and/or WebRTC offer).
+     * Phone WS connect alone is not enough — MediaProjection may still be pending.
+     */
+    private val _castingActive = MutableStateFlow(false)
+    val castingActive: StateFlow<Boolean> = _castingActive.asStateFlow()
+
     suspend fun setPhone(session: WebSocketSession) = mutex.withLock {
         phone = session
         _phoneConnected.value = true
@@ -31,6 +38,7 @@ object SignalingHub {
         if (phone === session) {
             phone = null
             _phoneConnected.value = false
+            _castingActive.value = false
         }
     }
 
@@ -40,6 +48,7 @@ object SignalingHub {
             val current = phone
             phone = null
             _phoneConnected.value = false
+            _castingActive.value = false
             current
         } ?: return
         runCatching {
@@ -55,6 +64,10 @@ object SignalingHub {
     }
 
     suspend fun hasViewer(): Boolean = mutex.withLock { viewer != null }
+
+    fun markCastingActive() {
+        _castingActive.value = true
+    }
 
     suspend fun sendToPhone(text: String) {
         val target = mutex.withLock { phone }

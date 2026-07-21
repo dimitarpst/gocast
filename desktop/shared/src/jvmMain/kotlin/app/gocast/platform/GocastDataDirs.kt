@@ -22,6 +22,18 @@ object GocastDataDirs {
     }
 
     /**
+     * Writable WebView2 user-data folder. Required for packaged installs under
+     * Program Files — the default UDF is next to the exe and creation fails.
+     */
+    fun webview2UserData(): File {
+        val dir = File(root(), "webview2")
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        return dir
+    }
+
+    /**
      * Older builds stored identity under `~/.gocast`. Copy into LocalAppData once
      * so upgrades keep the same PC name / trust tokens.
      */

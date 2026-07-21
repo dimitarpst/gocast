@@ -7,12 +7,10 @@ import androidx.compose.ui.Modifier
 @Composable
 fun ViewerPane(
     url: String,
-    reloadToken: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     WebView2ViewerPane(
         url = url,
-        reloadToken = reloadToken,
         modifier = modifier,
     )
 }

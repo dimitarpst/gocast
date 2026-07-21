@@ -9,7 +9,16 @@
 .idea/
 **/.idea/
 
-# Accidental WebRTC AAR extracts (not project source)
+# Accidental dependency / AAR extracts (not project source)
 .tmp-webrtc-src/
 **/.tmp-webrtc-src/
+.tmp-composewebview-src/
+**/.tmp-composewebview-src/
+.tmp-composewebview-jvm-src/
+**/.tmp-composewebview-jvm-src/
+.tmp-wrywebview-src/
+**/.tmp-wrywebview-src/
 /main/
+
+# Local cast debug captures
+.cast-freeze-logcat*.txt

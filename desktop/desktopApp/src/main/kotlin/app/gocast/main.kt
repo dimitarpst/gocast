@@ -38,7 +38,6 @@ fun main() {
     // Packaged Windows: detect whether inbound LAN is open (no UAC yet).
     WindowsLanAccess.refreshStatus()
 
-    println("gocast: viewer backend = WebView2")
     WebView2Support.prepareProcessEnvironment()
 
     val identityStore = DesktopIdentityStore()
@@ -87,6 +86,8 @@ fun main() {
                 if (awtIcons.isNotEmpty()) {
                     window.iconImages = awtIcons
                 }
+                // Match viewer / scaffold so AWT clear isn't white under WebView2.
+                window.background = java.awt.Color(0x12, 0x14, 0x1A)
                 // AWT minimum — Compose has no first-class minSize on Window yet.
                 window.minimumSize = Dimension(
                     MinWindowSize.width.value.toInt(),
@@ -107,6 +108,7 @@ fun main() {
                 isFullscreen = isFullscreen,
                 onToggleFullscreen = { isFullscreen = !isFullscreen },
                 onExitFullscreen = { isFullscreen = false },
+                ownerWindow = window,
             )
         }
     }

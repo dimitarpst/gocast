@@ -3,10 +3,11 @@ package app.gocast.server
 object ViewerPage {
     fun html(token: String): String = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background:#12141A;color-scheme:dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
   <title>gocast viewer</title>
   <style>
     * { box-sizing: border-box; }
@@ -15,17 +16,17 @@ object ViewerPage {
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #000;
+      background: #12141A;
       color: #eee;
       font-family: Segoe UI, system-ui, sans-serif;
     }
     #wrap {
       position: absolute;
       inset: 0;
-      background: #000;
+      background: #12141A;
     }
     /*
-     * CEF paints hardware-decoded <video> above HTML no matter the z-index.
+     * Hardware-decoded <video> can composite above HTML overlays in embeds.
      * Keep <video> as a tiny offscreen decoder and blit frames to <canvas>.
      */
     #video {
@@ -42,7 +43,7 @@ object ViewerPage {
       inset: 0;
       width: 100%;
       height: 100%;
-      background: #000;
+      background: #12141A;
       z-index: 0;
     }
     #status {

@@ -29,7 +29,7 @@ compose.desktop {
             // Windows release focus: MSI. Keep Deb/Dmg available for future.
             targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "gocast"
-            packageVersion = "1.0.1"
+            packageVersion = "1.0.2"
             // ASCII only — WiX/jpackage mangles fancy dashes and copyright symbols.
             description = "gocast — cast your Android phone screen to this PC over Wi-Fi"
             copyright = "Copyright 2026 gocast contributors. MIT License."
@@ -45,7 +45,7 @@ compose.desktop {
                 dirChooser = true
                 // Stable across releases so MSI upgrades replace the previous install.
                 upgradeUuid = "7E3A9C2B-5F14-4D8A-9B6E-1C0D4A8F2E75"
-                msiPackageVersion = "1.0.1"
+                msiPackageVersion = "1.0.2"
                 installationPath = "gocast"
             }
             linux {
@@ -76,11 +76,12 @@ afterEvaluate {
             )
         }
 
-        // WebView2 autoplay without a prior click (Gradle run).
+        // WebView2 autoplay + dark clear color (Gradle run).
         environment(
             "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
             "--autoplay-policy=no-user-gesture-required",
         )
+        environment("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF12141A")
     }
 
     // Ship uninstall wipe script into $APPDIR/resources (compose app resources).

@@ -124,10 +124,15 @@ class KtorGocastServer(
                             "phone" -> {
                                 val type = signalingType(text)
                                 if (type == "phone-media-ready") {
+                                    // After MediaProjection accept — not mere WS/QR connect.
+                                    SignalingHub.markCastingActive()
                                     if (SignalingHub.hasViewer()) {
                                         SignalingHub.sendToPhone("""{"type":"viewer-ready"}""")
                                     }
                                 } else {
+                                    if (type == "offer") {
+                                        SignalingHub.markCastingActive()
+                                    }
                                     SignalingHub.sendToViewer(text)
                                 }
                             }
