@@ -12,6 +12,7 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import app.gocast.network.CastConnection
+import app.gocast.network.SignalingBridge
 import app.gocast.settings.CastQualityDiff
 import app.gocast.settings.CastQualitySettings
 import app.gocast.settings.CastQualityStore
@@ -20,10 +21,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class CaptureService : Service() {
+
+    enum class CastUiState {
+        Idle,
+        Casting,
+        Paused,
+    }
 
     companion object {
         private const val TAG = "CaptureService"
@@ -34,10 +44,22 @@ class CaptureService : Service() {
         @Volatile
         private var mediaActive = false
 
+        private val _castUiState = MutableStateFlow(CastUiState.Idle)
+        val castUiState: StateFlow<CastUiState> = _castUiState.asStateFlow()
+
         fun isMediaActive(): Boolean = mediaActive
 
-        private fun setMediaActive(context: Context, active: Boolean) {
+        private fun publishCastUiState(paused: Boolean) {
+            _castUiState.value = when {
+                paused -> CastUiState.Paused
+                mediaActive -> CastUiState.Casting
+                else -> CastUiState.Idle
+            }
+        }
+
+        private fun setMediaActive(context: Context, active: Boolean, paused: Boolean) {
             mediaActive = active
+            publishCastUiState(paused)
             GocastTileService.requestUpdate(context)
         }
 
@@ -91,6 +113,7 @@ class CaptureService : Service() {
                     paused = false
                     startingCapture = false
                     appliedQuality = null
+                    setMediaActive(applicationContext, active = false, paused = false)
                     CastConnection.stop()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -192,7 +215,7 @@ class CaptureService : Service() {
             audioTrack = session.audioTrack,
         ).also { it.start() }
         appliedQuality = next
-        setMediaActive(applicationContext, true)
+        setMediaActive(applicationContext, active = true, paused = false)
         showForegroundNotification()
     }
 
@@ -200,6 +223,7 @@ class CaptureService : Service() {
         paused = false
         startingCapture = true
         CastConnection.ensureConnected()
+        publishCastUiState(paused = false)
         showForegroundNotification()
         acquireCastWakeLock()
 
@@ -237,7 +261,8 @@ class CaptureService : Service() {
                 quality,
                 audioTrack = session.audioTrack,
             ).also { it.start() }
-            setMediaActive(applicationContext, true)
+            setMediaActive(applicationContext, active = true, paused = false)
+            SignalingBridge.send("""{"type":"cast-resumed"}""")
         } else {
             Log.e(TAG, "Missing factory/track after capturer start")
         }
@@ -273,7 +298,8 @@ class CaptureService : Service() {
     }
 
     override fun onDestroy() {
-        setMediaActive(applicationContext, false)
+        paused = false
+        setMediaActive(applicationContext, active = false, paused = false)
         publisher?.stop()
         screenCast?.stop(projectionAlreadyStopped = true)
         publisher = null
@@ -289,6 +315,9 @@ class CaptureService : Service() {
         if (paused) return
         paused = true
         startingCapture = false
+        // Tell the PC immediately — don't wait for ICE to time out on a black frame.
+        SignalingBridge.send("""{"type":"cast-paused"}""")
+        setMediaActive(applicationContext, active = false, paused = true)
         showForegroundNotification()
         serviceScope.launch {
             tearDownMedia(projectionAlreadyStopped = true)
@@ -301,7 +330,9 @@ class CaptureService : Service() {
         val session = screenCast
         publisher = null
         screenCast = null
-        setMediaActive(applicationContext, false)
+        if (!paused) {
+            setMediaActive(applicationContext, active = false, paused = false)
+        }
         releaseCastWakeLock()
 
         pub?.stop()

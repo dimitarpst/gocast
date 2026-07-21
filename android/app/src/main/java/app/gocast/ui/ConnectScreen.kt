@@ -12,10 +12,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,6 +55,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.gocast.R
 import app.gocast.capture.CaptureConsent
+import app.gocast.capture.CaptureService
 import app.gocast.cast.CastEvent
 import app.gocast.cast.CastViewModel
 import app.gocast.domain.ConnectionState
@@ -86,6 +89,7 @@ fun ConnectScreen(
     val trustedPc by viewModel.trustedPc.collectAsStateWithLifecycle()
     val discoveredHosts by viewModel.discoveredHosts.collectAsStateWithLifecycle()
     val joinBusy by viewModel.joinBusy.collectAsStateWithLifecycle()
+    val castUiState by CaptureService.castUiState.collectAsStateWithLifecycle()
     var mode by remember { mutableStateOf(ConnectMode.Home) }
     var selectedHost by remember { mutableStateOf<DiscoveredHost?>(null) }
     var codeInput by remember { mutableStateOf("") }
@@ -251,10 +255,12 @@ fun ConnectScreen(
                 trustedPc = trustedPc,
                 canJoin = canJoin,
                 isActiveCast = isActiveCast,
+                castPaused = castUiState == CaptureService.CastUiState.Paused,
                 joinBusy = joinBusy,
                 onCastTrusted = { viewModel.castToTrustedPc() },
                 onScanQr = { qrScanner.launch(scannerConfig) },
                 onFindWifi = { mode = ConnectMode.Discover },
+                onResume = { viewModel.onResumeCastRequested() },
                 onStop = { viewModel.stopCast() },
                 onQuality = { mode = ConnectMode.Quality },
             )
@@ -316,10 +322,12 @@ private fun HomeContent(
     trustedPc: TrustedPc?,
     canJoin: Boolean,
     isActiveCast: Boolean,
+    castPaused: Boolean,
     joinBusy: Boolean,
     onCastTrusted: () -> Unit,
     onScanQr: () -> Unit,
     onFindWifi: () -> Unit,
+    onResume: () -> Unit,
     onStop: () -> Unit,
     onQuality: () -> Unit,
 ) {
@@ -335,44 +343,50 @@ private fun HomeContent(
                 .fillMaxWidth(0.72f)
                 .height(48.dp),
         )
-        Spacer(Modifier.height(20.dp))
-
-        Text(
-            text = label,
-            style = if (connectionState is ConnectionState.Idle) {
-                MaterialTheme.typography.titleMedium
-            } else {
-                MaterialTheme.typography.headlineSmall
-            },
-            fontWeight = if (connectionState is ConnectionState.Idle) {
-                FontWeight.Medium
-            } else {
-                FontWeight.SemiBold
-            },
-            color = when (connectionState) {
-                is ConnectionState.Failed -> MaterialTheme.colorScheme.error
-                is ConnectionState.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(28.dp))
 
         if (isActiveCast) {
-            ActiveCastCard(
+            // Connected session: fill the screen with clear status + large actions
+            // (M3 simple-screen pattern — avoid a tiny card floating in empty space).
+            ActiveCastPanel(
                 displayName = trustedPc?.displayName,
+                paused = castPaused,
+                onResume = onResume,
                 onStop = onStop,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
             )
-            Spacer(Modifier.weight(1f))
             Text(
                 text = stringResource(R.string.quality_live_hint),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                    .padding(horizontal = 8.dp, vertical = 16.dp),
             )
+        } else {
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = label,
+                style = if (connectionState is ConnectionState.Idle) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.headlineSmall
+                },
+                fontWeight = if (connectionState is ConnectionState.Idle) {
+                    FontWeight.Medium
+                } else {
+                    FontWeight.SemiBold
+                },
+                color = when (connectionState) {
+                    is ConnectionState.Failed -> MaterialTheme.colorScheme.error
+                    is ConnectionState.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(28.dp))
         }
 
         if (canJoin) {
@@ -419,31 +433,97 @@ private fun HomeContent(
 }
 
 @Composable
-private fun ActiveCastCard(
+private fun ActiveCastPanel(
     displayName: String?,
+    paused: Boolean,
+    onResume: () -> Unit,
     onStop: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
+    Column(
+        modifier = modifier.padding(top = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            if (displayName != null) {
+        Text(
+            text = displayName ?: stringResource(R.string.app_name),
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = if (paused) {
+                stringResource(R.string.cast_paused_title)
+            } else {
+                stringResource(R.string.cast_live_label)
+            },
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = if (paused) {
+                MaterialTheme.colorScheme.tertiary
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (paused) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.cast_paused_body),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+            )
+        }
+        Spacer(Modifier.height(36.dp))
+        if (paused) {
+            Button(
+                onClick = onResume,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            ) {
                 Text(
-                    text = stringResource(R.string.casting_to, displayName),
+                    text = stringResource(R.string.resume_cast),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
-                Spacer(Modifier.height(12.dp))
             }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onStop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.stop_cast),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        } else {
             Button(
                 onClick = onStop,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             ) {
-                Text(stringResource(R.string.stop_cast))
+                Text(
+                    text = stringResource(R.string.stop_cast),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }

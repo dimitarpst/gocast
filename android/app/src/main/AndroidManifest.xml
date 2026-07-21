@@ -59,6 +59,15 @@
             android:exported="false"
             android:theme="@style/Theme.Gocast.Translucent" />
 
+        <activity
+            android:name=".capture.ResumeCastActivity"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Gocast.ResumeOverlay" />
+
         <service
             android:name=".capture.CaptureService"
             android:exported="false"

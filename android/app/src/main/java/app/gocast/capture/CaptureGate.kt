@@ -35,8 +35,11 @@ class CaptureGate {
     }
 
     suspend fun requestConsentAgain() {
+        // Explicit resume — don't drop behind QuickCast/Resume suppress, and
+        // allow a second tap if a previous dialog was abandoned.
         captureRequested = true
-        emitConsentOnce()
+        consentDialogPending = true
+        _events.emit(CastEvent.RequestCaptureConsent)
     }
 
     fun onConsentResult(context: Context, resultCode: Int, data: Intent?) {

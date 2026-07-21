@@ -14,6 +14,10 @@
     <string name="tap_to_cast">Tap to cast</string>
     <string name="tap_to_enter_code">Tap to enter pairing code</string>
     <string name="casting_to">Casting to %1$s</string>
+    <string name="cast_live_label">Casting</string>
+    <string name="cast_paused_title">Paused</string>
+    <string name="cast_paused_body">Your phone stopped sharing. Resume to continue on your PC.</string>
+    <string name="resume_cast">Resume</string>
     <string name="other_ways">Or connect another way</string>
     <string name="quality_settings">Quality settings</string>
     <string name="quality_live_hint">Tweaking quality while casting applies in real time.</string>

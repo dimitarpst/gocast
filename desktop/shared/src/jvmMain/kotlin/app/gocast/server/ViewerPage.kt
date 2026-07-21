@@ -44,6 +44,35 @@ object ViewerPage {
       border-radius: 4px;
       pointer-events: none;
     }
+    #paused {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.42);
+      pointer-events: none;
+      text-align: center;
+      padding: 24px;
+    }
+    #paused.visible { display: flex; }
+    #paused .title {
+      font-size: 22px;
+      font-weight: 600;
+      color: #f2f4f8;
+      letter-spacing: 0.01em;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.55);
+    }
+    #paused .hint {
+      font-size: 14px;
+      color: rgba(232, 236, 245, 0.82);
+      max-width: 28em;
+      line-height: 1.45;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+    }
 
     /* Collapsed = perfect circle; hover expands into a pill with a fat slider */
     #vol {
@@ -236,6 +265,10 @@ object ViewerPage {
   <div id="wrap">
     <video id="video" autoplay playsinline muted></video>
     <audio id="cast-audio" autoplay></audio>
+    <div id="paused" aria-live="polite">
+      <div class="title">Stream paused</div>
+      <div class="hint">Resume from the casting notification on your phone.</div>
+    </div>
     <div id="status">Connecting…</div>
 
     <div id="vol" title="Volume">
@@ -257,6 +290,7 @@ object ViewerPage {
   <script>
     const TOKEN = ${token.toJsonString()};
     const statusEl = document.getElementById('status');
+    const pausedEl = document.getElementById('paused');
     const video = document.getElementById('video');
     // Picture and sound on separate elements — A/V on one <video> freezes KCEF on frame 1.
     const audio = document.getElementById('cast-audio');
@@ -277,8 +311,15 @@ object ViewerPage {
     let preMuteVolume = 1;
     let videoStream = null;
     let audioStream = null;
+    let streamPaused = false;
 
     function setStatus(text) { statusEl.textContent = text; }
+
+    function setStreamPaused(paused) {
+      streamPaused = paused;
+      pausedEl.classList.toggle('visible', paused);
+      if (paused) setStatus('Paused');
+    }
 
     function applyAudioUi() {
       video.muted = true;
@@ -396,9 +437,13 @@ object ViewerPage {
         }
         const v = videoStream ? videoStream.getTracks().length : 0;
         const a = audioStream ? audioStream.getTracks().length : 0;
-        if (v > 0 || a > 0) setStatus('Casting');
+        if (v > 0 || a > 0) {
+          setStreamPaused(false);
+          setStatus('Casting');
+        }
       };
       pc.onconnectionstatechange = () => {
+        if (streamPaused) return;
         const state = pc.connectionState;
         if (state === 'connected') {
           setStatus('Connected');
@@ -435,13 +480,23 @@ object ViewerPage {
       let msg;
       try { msg = JSON.parse(text); } catch (_) { return; }
 
+      if (msg.type === 'cast-paused') {
+        setStreamPaused(true);
+        return;
+      }
+      if (msg.type === 'cast-resumed') {
+        setStreamPaused(false);
+        setStatus('Resuming…');
+        return;
+      }
       if (msg.type === 'offer' && msg.sdp) {
+        setStreamPaused(false);
         wirePeerConnection();
         await pc.setRemoteDescription({ type: 'offer', sdp: msg.sdp });
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         ws.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
-        setStatus('Answer sent');
+        setStatus('Connecting…');
       } else if (msg.type === 'ice' && msg.candidate) {
         if (!pc) return;
         try {

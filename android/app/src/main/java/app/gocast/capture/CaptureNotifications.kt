@@ -96,12 +96,15 @@ object CaptureNotifications {
     }
 
     private fun resumePendingIntent(context: Context): PendingIntent {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            action = MainActivity.ACTION_RESUME_CAST
+        // Own task (see ResumeCastActivity affinity) so we don't bring MainActivity
+        // forward when gocast is sitting in recents behind Chrome/etc.
+        val intent = Intent(context, ResumeCastActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                Intent.FLAG_ACTIVITY_MULTIPLE_TASK or
+                Intent.FLAG_ACTIVITY_NO_HISTORY or
+                Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or
+                Intent.FLAG_ACTIVITY_NO_ANIMATION or
+                Intent.FLAG_ACTIVITY_NO_USER_ACTION
         }
         return PendingIntent.getActivity(
             context,
