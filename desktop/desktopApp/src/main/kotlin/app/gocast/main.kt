@@ -1,28 +1,37 @@
 package app.gocast
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.res.useResource
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.gocast.discovery.GocastAdvertiser
 import app.gocast.domain.JvmSessionFactory
+import app.gocast.platform.GocastShutdown
 import app.gocast.platform.WindowsLanAccess
 import app.gocast.server.KtorGocastServer
 import app.gocast.server.SessionGuard
 import app.gocast.trust.DesktopIdentityStore
 import kotlinx.coroutines.runBlocking
+import java.awt.Dimension
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 
+private val MinWindowSize = DpSize(960.dp, 640.dp)
+private val DefaultWindowSize = DpSize(1280.dp, 800.dp)
+
 fun main() {
-    // Packaged Windows builds: open LAN before we bind so phones can connect.
-    // Gradle run skips this; the OS Allow dialog still appears on first listen
-    // if netsh could not add a rule without elevation.
-    WindowsLanAccess.ensureInboundAccess()
+    // Packaged Windows: detect whether inbound LAN is open (no UAC yet).
+    WindowsLanAccess.refreshStatus()
 
     val identityStore = DesktopIdentityStore()
     val server = KtorGocastServer(identityStore)
@@ -43,26 +52,42 @@ fun main() {
     val awtIcons = loadAwtIconSizes()
 
     application {
+        val windowState = rememberWindowState(size = DefaultWindowSize)
+        var isFullscreen by remember { mutableStateOf(false) }
+
         Window(
             onCloseRequest = {
-                advertiser.stop()
-                runBlocking { server.stop() }
+                // Close immediately — KCEF dispose used to freeze the X for seconds.
+                GocastShutdown.beginBackground(advertiser, server)
                 exitApplication()
             },
             title = "gocast",
             icon = appIcon,
-            state = rememberWindowState(width = 1280.dp, height = 800.dp),
+            state = windowState,
         ) {
-            // Title-bar needs dedicated 16/32px bitmaps — a single 256px downscale looks scuffed.
             LaunchedEffect(Unit) {
                 if (awtIcons.isNotEmpty()) {
                     window.iconImages = awtIcons
+                }
+                // AWT minimum — Compose has no first-class minSize on Window yet.
+                window.minimumSize = Dimension(
+                    MinWindowSize.width.value.toInt(),
+                    MinWindowSize.height.value.toInt(),
+                )
+            }
+            LaunchedEffect(isFullscreen) {
+                windowState.placement = if (isFullscreen) {
+                    WindowPlacement.Fullscreen
+                } else {
+                    WindowPlacement.Floating
                 }
             }
             GocastRoot(
                 session = session,
                 identityStore = identityStore,
                 advertiser = advertiser,
+                isFullscreen = isFullscreen,
+                onToggleFullscreen = { isFullscreen = !isFullscreen },
             )
         }
     }

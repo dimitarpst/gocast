@@ -40,8 +40,9 @@ class KtorGocastServer(
     override suspend fun start(port: Int) {
         if (isRunning) return
 
-        // Dual-stack: IPv6 any (::) also accepts IPv4-mapped where the OS allows it.
-        engine = embeddedServer(Netty, host = "::", port = port) {
+        // IPv4 any — phones on LAN connect over IPv4. Binding only to "::" is
+        // dual-stack on some Windows setups and a silent black hole on others.
+        engine = embeddedServer(Netty, host = "0.0.0.0", port = port) {
             configureRouting()
         }.start(wait = false)
     }

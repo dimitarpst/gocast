@@ -1,18 +1,17 @@
 package app.gocast.platform
 
+import java.io.File
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 /**
- * Ensures the packaged Windows app can accept inbound LAN connections (TCP 8765).
+ * Opens inbound LAN access for packaged Windows builds (TCP 8765).
  *
- * Gradle/`java` runs never reliably show the Windows Firewall Allow popup.
- * For the installed `gocast.exe` we:
- * 1. Try to add inbound Allow rules with `netsh` (not PowerShell) for the exe + port
- * 2. If that fails without elevation, the first listen on 8765 still triggers the
- *    normal Windows "Allow on private networks?" dialog for `gocast.exe`
+ * Silent non-elevated `netsh` does nothing. The Windows "Allow app?" dialog also
+ * does not reliably appear for jpackage/`gocast.exe`. So we request elevation
+ * (UAC) and add firewall Allow rules via `netsh` — never PowerShell.
  */
 object WindowsLanAccess {
 
@@ -20,31 +19,62 @@ object WindowsLanAccess {
     private const val RULE_PORT = "gocast TCP 8765"
     private const val PORT = 8765
 
-    fun ensureInboundAccess(
+    enum class Status {
+        /** Not Windows, or Gradle/dev run — leave firewall alone. */
+        NotApplicable,
+        /** Rules are present (or we successfully added them). */
+        Allowed,
+        /** Need UAC / user action — phone will time out until this is fixed. */
+        Blocked,
+    }
+
+    private val statusRef = AtomicReference(Status.NotApplicable)
+
+    fun status(): Status = statusRef.get()
+
+    /** Cheap check at process start — no UAC. */
+    fun refreshStatus() {
+        if (!isWindows() || !isPackagedDistribution()) {
+            statusRef.set(Status.NotApplicable)
+            return
+        }
+        if (rulesPresent()) {
+            markConfigured(Path.of(System.getProperty("user.home"), ".gocast"))
+            statusRef.set(Status.Allowed)
+        } else {
+            statusRef.set(Status.Blocked)
+        }
+    }
+
+    /**
+     * Shows UAC and adds Allow rules. Call from UI when [status] is [Status.Blocked].
+     */
+    fun requestAllowNow(
         prefsDir: Path = Path.of(System.getProperty("user.home"), ".gocast"),
-    ) {
-        if (!isWindows()) return
-        if (!isPackagedDistribution()) return
-        if (alreadyConfigured(prefsDir)) return
-
-        val exe = currentExePath()
-        var ok = false
-        if (exe != null) {
-            ok = addProgramRule(exe) || ok
+    ): Status {
+        if (!isWindows() || !isPackagedDistribution()) {
+            statusRef.set(Status.NotApplicable)
+            return status()
         }
-        ok = addPortRule(PORT) || ok
-
-        // Mark done if we installed a rule. If not, leave unmarked so a later
-        // elevated/admin run can retry — the OS Allow dialog may still appear.
-        if (ok) {
+        if (rulesPresent()) {
             markConfigured(prefsDir)
+            statusRef.set(Status.Allowed)
+            return status()
         }
+        val ok = addRulesElevated(currentExePath())
+        if (ok || rulesPresent()) {
+            markConfigured(prefsDir)
+            statusRef.set(Status.Allowed)
+        } else {
+            runCatching { flagFile(prefsDir).toFile().delete() }
+            statusRef.set(Status.Blocked)
+        }
+        return status()
     }
 
     private fun isWindows(): Boolean =
         System.getProperty("os.name").orEmpty().contains("windows", ignoreCase = true)
 
-    /** jpackage / Compose distributable sets this; Gradle `run` does not. */
     private fun isPackagedDistribution(): Boolean {
         if (!System.getProperty("compose.application.resources.dir").isNullOrBlank()) return true
         if (!System.getProperty("jpackage.app-path").isNullOrBlank()) return true
@@ -56,48 +86,97 @@ object WindowsLanAccess {
         val fromJpackage = System.getProperty("jpackage.app-path")
         if (!fromJpackage.isNullOrBlank()) return fromJpackage
         val cmd = ProcessHandle.current().info().command().orElse(null) ?: return null
-        return cmd.takeIf { it.endsWith(".exe", ignoreCase = true) }
+        return cmd.takeIf { it.endsWith("gocast.exe", ignoreCase = true) }
     }
 
-    private fun addProgramRule(exePath: String): Boolean =
-        runNetsh(
-            "advfirewall", "firewall", "add", "rule",
-            "name=$RULE_PROGRAM",
-            "dir=in",
-            "action=allow",
-            "program=$exePath",
-            "enable=yes",
-            "profile=private",
+    private fun rulesPresent(): Boolean {
+        val program = runNetshCapture(
+            "advfirewall", "firewall", "show", "rule", "name=$RULE_PROGRAM",
+        )
+        if (program.ok &&
+            program.output.contains(RULE_PROGRAM, ignoreCase = true) &&
+            !program.output.contains("No rules match", ignoreCase = true)
+        ) {
+            return true
+        }
+        val port = runNetshCapture(
+            "advfirewall", "firewall", "show", "rule", "name=$RULE_PORT",
+        )
+        return port.ok &&
+            port.output.contains("8765") &&
+            !port.output.contains("No rules match", ignoreCase = true)
+    }
+
+    private fun addRulesElevated(exePath: String?): Boolean {
+        val tempDir = File(System.getProperty("java.io.tmpdir"), "gocast-fw").also { it.mkdirs() }
+        val pid = ProcessHandle.current().pid()
+        val done = File(tempDir, "done-$pid.txt")
+        val script = File(tempDir, "allow-$pid.cmd")
+        val vbs = File(tempDir, "elevate-$pid.vbs")
+        done.delete()
+
+        val lines = mutableListOf("@echo off")
+        if (exePath != null) {
+            lines += "netsh advfirewall firewall delete rule name=\"$RULE_PROGRAM\" >nul 2>&1"
+            lines += "netsh advfirewall firewall add rule name=\"$RULE_PROGRAM\" " +
+                "dir=in action=allow program=\"$exePath\" enable=yes profile=any"
+        }
+        lines += "netsh advfirewall firewall delete rule name=\"$RULE_PORT\" >nul 2>&1"
+        lines += "netsh advfirewall firewall add rule name=\"$RULE_PORT\" " +
+            "dir=in action=allow protocol=TCP localport=$PORT enable=yes profile=any"
+        lines += "echo ok>\"${done.absolutePath}\""
+        script.writeText(lines.joinToString("\r\n"), Charsets.UTF_8)
+
+        val cmdPath = script.absolutePath
+        vbs.writeText(
+            "Set sh = CreateObject(\"Shell.Application\")\r\n" +
+                // 0 = hidden window — no scary black CMD flash for the user.
+                "sh.ShellExecute \"cmd.exe\", \"/c \"\"$cmdPath\"\"\", \"\", \"runas\", 0\r\n",
+            Charsets.UTF_8,
         )
 
-    private fun addPortRule(port: Int): Boolean =
-        runNetsh(
-            "advfirewall", "firewall", "add", "rule",
-            "name=$RULE_PORT",
-            "dir=in",
-            "action=allow",
-            "protocol=TCP",
-            "localport=$port",
-            "enable=yes",
-            "profile=private",
-        )
-
-    private fun runNetsh(vararg args: String): Boolean {
         return try {
-            val pb = ProcessBuilder("netsh", *args)
+            ProcessBuilder("wscript.exe", "//nologo", vbs.absolutePath)
                 .redirectErrorStream(true)
-            val process = pb.start()
-            val output = process.inputStream.bufferedReader().readText()
-            val code = process.waitFor()
-            code == 0 || output.contains("Ok.", ignoreCase = true)
+                .start()
+                .waitFor()
+
+            // User may take a few seconds on UAC; cancel → no done file.
+            val deadline = System.currentTimeMillis() + 120_000
+            while (System.currentTimeMillis() < deadline) {
+                if (done.exists()) {
+                    return rulesPresent()
+                }
+                // If rules appeared from another path, succeed early.
+                if (rulesPresent()) return true
+                Thread.sleep(400)
+            }
+            rulesPresent()
         } catch (_: Exception) {
             false
+        } finally {
+            runCatching { done.delete() }
+            runCatching { script.delete() }
+            runCatching { vbs.delete() }
+        }
+    }
+
+    private data class NetshResult(val ok: Boolean, val output: String)
+
+    private fun runNetshCapture(vararg args: String): NetshResult {
+        return try {
+            val process = ProcessBuilder("netsh", *args)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().readText()
+            val code = process.waitFor()
+            NetshResult(code == 0, output)
+        } catch (_: Exception) {
+            NetshResult(false, "")
         }
     }
 
     private fun flagFile(prefsDir: Path): Path = prefsDir.resolve("firewall-lan-ok")
-
-    private fun alreadyConfigured(prefsDir: Path): Boolean = flagFile(prefsDir).exists()
 
     private fun markConfigured(prefsDir: Path) {
         prefsDir.createDirectories()

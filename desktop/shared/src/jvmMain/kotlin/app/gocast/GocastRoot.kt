@@ -14,12 +14,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,14 +35,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gocast.discovery.GocastAdvertiser
 import app.gocast.domain.model.JoinSession
+import app.gocast.platform.AppRelaunch
+import app.gocast.platform.GocastDataDirs
+import app.gocast.platform.WindowsLanAccess
 import app.gocast.server.SessionGuard
 import app.gocast.trust.DesktopIdentityStore
 import app.gocast.ui.BrandHeader
+import app.gocast.ui.LanSetupScreen
 import dev.datlag.kcef.KCEF
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.cef.callback.CefCommandLine
-import java.io.File
 import kotlin.math.max
 
 @Composable
@@ -49,19 +53,27 @@ fun GocastRoot(
     session: JoinSession,
     identityStore: DesktopIdentityStore,
     advertiser: GocastAdvertiser,
+    isFullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
 ) {
     var kcefReady by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0f) }
     var restartRequired by remember { mutableStateOf(false) }
     var initError by remember { mutableStateOf<String?>(null) }
     var displayName by remember { mutableStateOf(session.displayName) }
+    // Packaged Windows with no firewall rule: gate QR until LAN setup finishes.
+    var lanReady by remember {
+        mutableStateOf(WindowsLanAccess.status() != WindowsLanAccess.Status.Blocked)
+    }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
+                val bundleDir = GocastDataDirs.kcefBundle()
+                val cacheDir = GocastDataDirs.kcefCache()
                 KCEF.init(
                     builder = {
-                        installDir(File("kcef-bundle"))
+                        installDir(bundleDir)
                         // addArgs() is ignored by many KCEF/JCEF builds — set the
                         // Chromium switch in onBeforeCommandLineProcessing instead.
                         // Without this, unmuted <audio> throws NotAllowedError until
@@ -89,7 +101,7 @@ fun GocastRoot(
                             }
                         }
                         settings {
-                            cachePath = File("kcef-cache").absolutePath
+                            cachePath = cacheDir.absolutePath
                         }
                     },
                     onError = { error ->
@@ -107,22 +119,25 @@ fun GocastRoot(
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            KCEF.disposeBlocking()
-        }
-    }
+    // Do not disposeBlocking() here — it freezes the window close button for seconds.
+    // Shutdown is handled from main.kt on a background thread.
 
     MaterialTheme {
         when {
             restartRequired -> {
-                StartupMessage("Restart gocast to finish the built-in viewer setup")
+                RestartRequiredScreen(
+                    canRelaunch = AppRelaunch.canRelaunchPackagedApp(),
+                    onRestart = { AppRelaunch.relaunchPackagedAppOrExit() },
+                )
             }
             initError != null -> {
                 StartupMessage("Viewer engine failed: $initError")
             }
             !kcefReady -> {
                 ViewerLoadingScreen(progressPercent = downloadProgress)
+            }
+            !lanReady -> {
+                LanSetupScreen(onReady = { lanReady = true })
             }
             else -> App(
                 session = session,
@@ -133,7 +148,56 @@ fun GocastRoot(
                     SessionGuard.displayName = updated.displayName
                     advertiser.start(session.port, session.instanceId, updated.displayName)
                 },
+                isFullscreen = isFullscreen,
+                onToggleFullscreen = onToggleFullscreen,
             )
+        }
+    }
+}
+
+@Composable
+private fun RestartRequiredScreen(
+    canRelaunch: Boolean,
+    onRestart: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF12141A)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier
+                .widthIn(max = 420.dp)
+                .padding(32.dp),
+        ) {
+            Text(
+                text = "Viewer download finished",
+                color = Color(0xFFE8ECF5),
+                fontSize = 18.sp,
+            )
+            Text(
+                text = if (canRelaunch) {
+                    "Restart once to load the built-in viewer."
+                } else {
+                    "Close gocast and open it again to load the built-in viewer."
+                },
+                color = Color(0xFF9AA3B5),
+                fontSize = 14.sp,
+            )
+            if (canRelaunch) {
+                Button(
+                    onClick = onRestart,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6EA8FE),
+                        contentColor = Color(0xFF0E1016),
+                    ),
+                ) {
+                    Text("Restart gocast")
+                }
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -79,54 +80,72 @@ fun PairingScreen(
             .background(Color(0xFF12141A))
             .padding(horizontal = 40.dp, vertical = 28.dp),
     ) {
-        // Top band — brand + name live here, not in the QR stack.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            BrandHeader(logoHeight = 36.dp)
-            OutlinedTextField(
-                value = draftName,
-                onValueChange = { draftName = it.take(48) },
-                singleLine = true,
-                shape = PairingFieldShape,
-                label = { Text("This PC") },
-                trailingIcon = {
-                    EditGlyph(
-                        tint = Color(0xFF9AA3B5),
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        commitName()
-                        focusManager.clearFocus()
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val narrow = maxWidth < 720.dp
+            val nameField = @Composable {
+                OutlinedTextField(
+                    value = draftName,
+                    onValueChange = { draftName = it.take(48) },
+                    singleLine = true,
+                    shape = PairingFieldShape,
+                    label = { Text("This PC") },
+                    trailingIcon = {
+                        EditGlyph(
+                            tint = Color(0xFF9AA3B5),
+                            modifier = Modifier.size(18.dp),
+                        )
                     },
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = FieldText,
-                    unfocusedTextColor = FieldText,
-                    cursorColor = BrandBlue,
-                    focusedBorderColor = BrandBlue,
-                    unfocusedBorderColor = FieldBorder,
-                    focusedLabelColor = Color(0xFF9AA3B5),
-                    unfocusedLabelColor = FieldMuted,
-                    focusedTrailingIconColor = Color(0xFF9AA3B5),
-                    unfocusedTrailingIconColor = FieldMuted,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                ),
-                modifier = Modifier
-                    .widthIn(min = 200.dp, max = 280.dp)
-                    .onFocusChanged { state ->
-                        if (!state.isFocused) commitName()
-                    },
-            )
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            commitName()
+                            focusManager.clearFocus()
+                        },
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = FieldText,
+                        unfocusedTextColor = FieldText,
+                        cursorColor = BrandBlue,
+                        focusedBorderColor = BrandBlue,
+                        unfocusedBorderColor = FieldBorder,
+                        focusedLabelColor = Color(0xFF9AA3B5),
+                        unfocusedLabelColor = FieldMuted,
+                        focusedTrailingIconColor = Color(0xFF9AA3B5),
+                        unfocusedTrailingIconColor = FieldMuted,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                    ),
+                    modifier = Modifier
+                        .then(
+                            if (narrow) Modifier.fillMaxWidth()
+                            else Modifier.widthIn(min = 200.dp, max = 280.dp),
+                        )
+                        .onFocusChanged { state ->
+                            if (!state.isFocused) commitName()
+                        },
+                )
+            }
+
+            if (narrow) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    BrandHeader(logoHeight = 36.dp)
+                    nameField()
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    BrandHeader(logoHeight = 36.dp)
+                    nameField()
+                }
+            }
         }
 
-        // Stage — only join affordances, centered in the leftover space.
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -194,7 +213,6 @@ private fun EditGlyph(
 ) {
     Canvas(modifier = modifier) {
         val w = size.minDimension
-        // Shaft (parallelogram)
         val shaft = Path().apply {
             moveTo(w * 0.28f, w * 0.72f)
             lineTo(w * 0.68f, w * 0.32f)
@@ -204,7 +222,6 @@ private fun EditGlyph(
         }
         drawPath(shaft, color = tint)
 
-        // Tip
         val tip = Path().apply {
             moveTo(w * 0.28f, w * 0.72f)
             lineTo(w * 0.14f, w * 0.86f)
@@ -213,7 +230,6 @@ private fun EditGlyph(
         }
         drawPath(tip, color = tint)
 
-        // Eraser end band
         drawLine(
             color = tint,
             start = Offset(w * 0.62f, w * 0.26f),
@@ -222,7 +238,6 @@ private fun EditGlyph(
             cap = StrokeCap.Round,
         )
 
-        // Lead notch on tip (cuts into fill for definition)
         drawLine(
             color = Color(0xFF12141A),
             start = Offset(w * 0.22f, w * 0.78f),

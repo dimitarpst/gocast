@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import app.gocast.domain.model.JoinSession
 import app.gocast.server.SignalingHub
 import app.gocast.server.ViewerCommands
+import app.gocast.ui.AppOverflowMenu
 import app.gocast.ui.PairingScreen
 import app.gocast.ui.ViewerPane
 
@@ -32,6 +33,8 @@ fun App(
     session: JoinSession,
     displayName: String,
     onRename: (String) -> Unit,
+    isFullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
 ) {
     val phoneConnected by SignalingHub.phoneConnected.collectAsState()
     var showPairing by remember { mutableStateOf(true) }
@@ -78,6 +81,14 @@ fun App(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+
+            AppOverflowMenu(
+                isFullscreen = isFullscreen,
+                onToggleFullscreen = onToggleFullscreen,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+            )
         }
     }
 }
