@@ -196,6 +196,7 @@ class WebRtcPublisher(
         audioTrack?.let { pc.addTrack(it, listOf("gocast")) }
         applyCodecPreference(pc)
         applyVideoEncoding(pc)
+        applyAudioEncoding(pc)
         // BWE start/min/max — without this WebRTC ramps up from ~300 kbps and
         // the first seconds (or longer on stable links) look far worse than scrcpy.
         pc.setBitrate(
@@ -208,11 +209,15 @@ class WebRtcPublisher(
             object : SdpObserver {
                 override fun onCreateSuccess(desc: SessionDescription?) {
                     if (desc == null) return
+                    val offer = SessionDescription(
+                        desc.type,
+                        preferHighQualityOpus(desc.description),
+                    )
                     pc.setLocalDescription(
                         object : SdpObserver {
                             override fun onCreateSuccess(p0: SessionDescription?) = Unit
                             override fun onSetSuccess() {
-                                val payload = SignalingMessage(type = "offer", sdp = desc.description)
+                                val payload = SignalingMessage(type = "offer", sdp = offer.description)
                                 SignalingBridge.send(json.encodeToString(payload))
                             }
                             override fun onCreateFailure(error: String?) {
@@ -222,7 +227,7 @@ class WebRtcPublisher(
                                 Log.e(TAG, "setLocalDescription failure: $error")
                             }
                         },
-                        desc,
+                        offer,
                     )
                 }
                 override fun onSetSuccess() = Unit
@@ -295,7 +300,65 @@ class WebRtcPublisher(
         sender.parameters = params
     }
 
+    private fun applyAudioEncoding(pc: PeerConnection) {
+        if (audioTrack == null) return
+        val sender = pc.senders.firstOrNull { it.track()?.id() == audioTrack.id() } ?: return
+        val params = sender.parameters
+        for (encoding in params.encodings) {
+            encoding.maxBitrateBps = OPUS_MAX_AVERAGE_BITRATE_BPS
+        }
+        try {
+            sender.parameters = params
+        } catch (e: Exception) {
+            Log.w(TAG, "audio encoding params failed", e)
+        }
+    }
+
     companion object {
         private const val TAG = "WebRtcPublisher"
+        /** Stereo music bitrate — WebRTC voice defaults are far lower. */
+        private const val OPUS_MAX_AVERAGE_BITRATE_BPS = 256_000
+
+        /**
+         * Ask Opus for stereo + high bitrate. Without this, the offer stays in
+         * voice mode and bass/stereo image stay thin even with clean PCM.
+         */
+        fun preferHighQualityOpus(sdp: String): String {
+            val opusPayloadTypes = Regex("""a=rtpmap:(\d+) opus/""", RegexOption.IGNORE_CASE)
+                .findAll(sdp)
+                .map { it.groupValues[1] }
+                .toSet()
+            if (opusPayloadTypes.isEmpty()) return sdp
+
+            val eol = if (sdp.contains("\r\n")) "\r\n" else "\n"
+            return sdp.split(eol).joinToString(eol) { line ->
+                val fmtp = Regex("""^a=fmtp:(\d+) (.*)$""").matchEntire(line)
+                if (fmtp == null || fmtp.groupValues[1] !in opusPayloadTypes) {
+                    line
+                } else {
+                    val pt = fmtp.groupValues[1]
+                    var params = fmtp.groupValues[2]
+                    params = upsertFmtpParam(params, "stereo", "1")
+                    params = upsertFmtpParam(params, "sprop-stereo", "1")
+                    params = upsertFmtpParam(
+                        params,
+                        "maxaveragebitrate",
+                        OPUS_MAX_AVERAGE_BITRATE_BPS.toString(),
+                    )
+                    "a=fmtp:$pt $params"
+                }
+            }
+        }
+
+        private fun upsertFmtpParam(params: String, key: String, value: String): String {
+            val parts = params.split(';')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toMutableList()
+            val entry = "$key=$value"
+            val idx = parts.indexOfFirst { it.startsWith("$key=") }
+            if (idx >= 0) parts[idx] = entry else parts.add(entry)
+            return parts.joinToString(";")
+        }
     }
 }

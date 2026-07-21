@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.media.projection.MediaProjection
+import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -156,6 +157,10 @@ class ScreenCastSession(
 
         val adm = if (playbackCapture != null) {
             JavaAudioDeviceModule.builder(appContext)
+                // Music cast, not a call — avoid voice-tuned capture defaults.
+                .setAudioSource(MediaRecorder.AudioSource.DEFAULT)
+                .setSampleRate(48_000)
+                .setUseStereoInput(true)
                 .setUseHardwareAcousticEchoCanceler(false)
                 .setUseHardwareNoiseSuppressor(false)
                 .setAudioRecordStateCallback(
@@ -243,7 +248,9 @@ class ScreenCastSession(
             val projection = screenCapturer.mediaProjectionOrNull()
             if (projection != null) {
                 playbackCapture.bindProjection(projection)
-                val aSource = pcFactory.createAudioSource(MediaConstraints())
+                // Disable voice APM (high-pass / AGC / NS / AEC) — default WebRTC
+                // processing is what makes cast audio sound thin / no bass.
+                val aSource = pcFactory.createAudioSource(musicAudioConstraints())
                 audioSource = aSource
                 val aTrack = pcFactory.createAudioTrack("gocast_system_audio", aSource)
                 aTrack.setEnabled(true)
@@ -412,5 +419,24 @@ class ScreenCastSession(
 
     companion object {
         private const val TAG = "ScreenCastSession"
+
+        /** Turn off voice-call audio processing so system music keeps bass / dynamics. */
+        private fun musicAudioConstraints(): MediaConstraints =
+            MediaConstraints().apply {
+                val off = listOf(
+                    "googEchoCancellation",
+                    "googAutoGainControl",
+                    "googNoiseSuppression",
+                    "googHighpassFilter",
+                    "googTypingNoiseDetection",
+                    "googAudioMirroring",
+                    "echoCancellation",
+                    "autoGainControl",
+                    "noiseSuppression",
+                )
+                for (key in off) {
+                    optional.add(MediaConstraints.KeyValuePair(key, "false"))
+                }
+            }
     }
 }

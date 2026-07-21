@@ -396,12 +396,16 @@ object ViewerPage {
         }
         const v = videoStream ? videoStream.getTracks().length : 0;
         const a = audioStream ? audioStream.getTracks().length : 0;
-        setStatus('Receiving (video:' + v + ' audio:' + a + ')');
+        if (v > 0 || a > 0) setStatus('Casting');
       };
       pc.onconnectionstatechange = () => {
-        setStatus('Peer: ' + pc.connectionState);
-        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-          setStatus('Peer: ' + pc.connectionState + ' — waiting for phone…');
+        const state = pc.connectionState;
+        if (state === 'connected') {
+          setStatus('Connected');
+        } else if (state === 'connecting') {
+          setStatus('Connecting…');
+        } else if (state === 'failed' || state === 'closed' || state === 'disconnected') {
+          setStatus('Connection lost — waiting for phone…');
         }
       };
       pc.onicecandidate = (event) => {
