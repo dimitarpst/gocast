@@ -234,7 +234,8 @@ object ViewerPage {
 </head>
 <body>
   <div id="wrap">
-    <video id="video" autoplay playsinline></video>
+    <video id="video" autoplay playsinline muted></video>
+    <audio id="cast-audio" autoplay></audio>
     <div id="status">Connecting…</div>
 
     <div id="vol" title="Volume">
@@ -257,6 +258,8 @@ object ViewerPage {
     const TOKEN = ${token.toJsonString()};
     const statusEl = document.getElementById('status');
     const video = document.getElementById('video');
+    // Picture and sound on separate elements — A/V on one <video> freezes KCEF on frame 1.
+    const audio = document.getElementById('cast-audio');
     const fab = document.getElementById('fab');
     const menu = document.getElementById('menu');
     const btnRetry = document.getElementById('btn-retry');
@@ -269,55 +272,38 @@ object ViewerPage {
     const ICON_RETRY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>';
     btnRetry.innerHTML = ICON_RETRY;
 
-    // Desktop cast audio: 100% unmuted by default. Phone speakers are muted separately.
     let volume = 1;
     let muted = false;
     let preMuteVolume = 1;
+    let videoStream = null;
+    let audioStream = null;
 
     function setStatus(text) { statusEl.textContent = text; }
 
     function applyAudioUi() {
-      video.volume = muted ? 0 : volume;
-      video.muted = muted || volume === 0;
+      video.muted = true;
+      video.volume = 0;
+      audio.volume = muted ? 0 : volume;
+      audio.muted = muted || volume === 0;
       btnVol.innerHTML = (muted || volume === 0) ? ICON_OFF : ICON_ON;
       btnVol.setAttribute('aria-label', (muted || volume === 0) ? 'Unmute' : 'Mute');
       btnVol.title = (muted || volume === 0) ? 'Unmute' : 'Mute';
       volSlider.value = String(muted ? 0 : volume);
     }
 
+    async function playEl(el) {
+      try { await el.play(); } catch (_) {}
+    }
+
     async function ensurePlaying() {
       applyAudioUi();
-      try {
-        await video.play();
-        return;
-      } catch (e) {
-        console.warn('unmuted play blocked, retrying', e);
-      }
-      // Autoplay policies sometimes require a muted play() first — do that
-      // temporarily, then restore 100% unmuted. Never flip the UI to muted.
-      video.muted = true;
-      try {
-        await video.play();
-      } catch (_) {
-        return;
-      }
-      applyAudioUi();
-      try {
-        await video.play();
-      } catch (e) {
-        console.warn('still blocked after unmute — click speaker to enable sound', e);
-      }
+      await playEl(video);
+      if (audio.srcObject) await playEl(audio);
     }
 
     applyAudioUi();
 
-    // If Chromium blocked unmuted autoplay, first click restores intended 100% sound.
-    document.getElementById('wrap').addEventListener('click', () => {
-      if (!muted && volume > 0 && (video.muted || video.volume === 0)) {
-        applyAudioUi();
-        ensurePlaying();
-      }
-    });
+    document.getElementById('wrap').addEventListener('click', () => ensurePlaying());
 
     btnVol.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -337,11 +323,11 @@ object ViewerPage {
       muted = volume === 0;
       if (volume > 0) preMuteVolume = volume;
       applyAudioUi();
+      if (audio.srcObject) playEl(audio);
     });
     volSlider.addEventListener('click', (e) => e.stopPropagation());
     volRoot.addEventListener('click', (e) => e.stopPropagation());
 
-    // Keep slider open briefly after interacting so it doesn't collapse mid-drag.
     let expandTimer = null;
     function bumpExpand() {
       volRoot.classList.add('expanded');
@@ -354,9 +340,7 @@ object ViewerPage {
     async function postAction(path) {
       try {
         await fetch(path, { method: 'POST', cache: 'no-store' });
-      } catch (e) {
-        console.warn('action failed', path, e);
-      }
+      } catch (_) {}
     }
 
     fab.addEventListener('click', (e) => {
@@ -385,27 +369,39 @@ object ViewerPage {
       if (pc) {
         try { pc.close(); } catch (_) {}
       }
+      videoStream = null;
+      audioStream = null;
+      video.srcObject = null;
+      audio.srcObject = null;
       pc = new RTCPeerConnection({ iceServers: [] });
       pc.ontrack = (event) => {
-        if (event.streams && event.streams[0]) {
-          video.srcObject = event.streams[0];
-        } else {
-          let stream = video.srcObject;
-          if (!(stream instanceof MediaStream)) {
-            stream = new MediaStream();
-            video.srcObject = stream;
+        const kind = event.track.kind;
+        if (kind === 'video') {
+          if (!videoStream) videoStream = new MediaStream();
+          if (!videoStream.getTracks().includes(event.track)) {
+            videoStream.addTrack(event.track);
           }
-          stream.addTrack(event.track);
+          video.srcObject = videoStream;
+          video.muted = true;
+          video.volume = 0;
+          playEl(video);
+        } else if (kind === 'audio') {
+          if (!audioStream) audioStream = new MediaStream();
+          if (!audioStream.getTracks().includes(event.track)) {
+            audioStream.addTrack(event.track);
+          }
+          audio.srcObject = audioStream;
+          applyAudioUi();
+          playEl(audio);
         }
-        applyAudioUi();
-        ensurePlaying();
-        setStatus('Receiving');
+        const v = videoStream ? videoStream.getTracks().length : 0;
+        const a = audioStream ? audioStream.getTracks().length : 0;
+        setStatus('Receiving (video:' + v + ' audio:' + a + ')');
       };
       pc.onconnectionstatechange = () => {
-        const state = pc.connectionState;
-        setStatus('Peer: ' + state);
-        if (state === 'failed' || state === 'closed') {
-          setStatus('Peer: ' + state + ' — waiting for phone…');
+        setStatus('Peer: ' + pc.connectionState);
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+          setStatus('Peer: ' + pc.connectionState + ' — waiting for phone…');
         }
       };
       pc.onicecandidate = (event) => {
@@ -450,9 +446,7 @@ object ViewerPage {
             sdpMid: msg.sdpMid ?? undefined,
             sdpMLineIndex: msg.sdpMLineIndex ?? undefined,
           });
-        } catch (e) {
-          console.warn('addIceCandidate', e);
-        }
+        } catch (_) {}
       }
     };
 

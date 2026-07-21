@@ -162,7 +162,11 @@ class ScreenCastSession(
                     object : JavaAudioDeviceModule.AudioRecordStateCallback {
                         override fun onWebRtcAudioRecordStart() {
                             val module = audioDeviceModule ?: return
-                            playbackCapture.replaceWebRtcMic(module)
+                            try {
+                                playbackCapture.replaceWebRtcMic(module)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Playback-capture swap failed", e)
+                            }
                         }
 
                         override fun onWebRtcAudioRecordStop() = Unit
@@ -170,8 +174,7 @@ class ScreenCastSession(
                 )
                 .createAudioDeviceModule()
                 .also {
-                    // Send-only cast — mute WebRTC playout so a local AudioTrack
-                    // doesn't steal hardware volume keys from our MediaSession.
+                    // Send-only cast — no local WebRTC playout.
                     it.setSpeakerMute(true)
                     audioDeviceModule = it
                 }

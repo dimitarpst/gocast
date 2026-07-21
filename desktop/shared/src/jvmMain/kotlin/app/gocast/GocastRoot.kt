@@ -40,6 +40,7 @@ import app.gocast.ui.BrandHeader
 import dev.datlag.kcef.KCEF
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.cef.callback.CefCommandLine
 import java.io.File
 import kotlin.math.max
 
@@ -61,6 +62,24 @@ fun GocastRoot(
                 KCEF.init(
                     builder = {
                         installDir(File("kcef-bundle"))
+                        // addArgs() is ignored by many KCEF/JCEF builds — set the
+                        // Chromium switch in onBeforeCommandLineProcessing instead.
+                        // Without this, unmuted <audio> throws NotAllowedError until
+                        // the user clicks the volume slider (a "user gesture").
+                        appHandler(
+                            object : KCEF.AppHandler() {
+                                override fun onBeforeCommandLineProcessing(
+                                    process_type: String?,
+                                    command_line: CefCommandLine?,
+                                ) {
+                                    super.onBeforeCommandLineProcessing(process_type, command_line)
+                                    command_line?.appendSwitchWithValue(
+                                        "autoplay-policy",
+                                        "no-user-gesture-required",
+                                    )
+                                }
+                            },
+                        )
                         progress {
                             onDownloading {
                                 downloadProgress = max(it, 0f)
