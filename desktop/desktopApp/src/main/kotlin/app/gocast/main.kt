@@ -8,6 +8,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.res.useResource
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -26,7 +30,7 @@ import java.awt.Dimension
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 
-private val MinWindowSize = DpSize(960.dp, 640.dp)
+private val MinWindowSize = DpSize(640.dp, 400.dp)
 private val DefaultWindowSize = DpSize(1280.dp, 800.dp)
 
 fun main() {
@@ -64,6 +68,17 @@ fun main() {
             title = "gocast",
             icon = appIcon,
             state = windowState,
+            onPreviewKeyEvent = { event ->
+                if (event.type == KeyEventType.KeyDown &&
+                    event.key == Key.Escape &&
+                    isFullscreen
+                ) {
+                    isFullscreen = false
+                    true
+                } else {
+                    false
+                }
+            },
         ) {
             LaunchedEffect(Unit) {
                 if (awtIcons.isNotEmpty()) {
@@ -88,6 +103,7 @@ fun main() {
                 advertiser = advertiser,
                 isFullscreen = isFullscreen,
                 onToggleFullscreen = { isFullscreen = !isFullscreen },
+                onExitFullscreen = { isFullscreen = false },
             )
         }
     }

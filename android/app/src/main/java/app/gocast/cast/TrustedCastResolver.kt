@@ -14,6 +14,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 object TrustedCastResolver {
 
+    /**
+     * Resolve last trusted PC only when it is visible on Wi-Fi (mDNS).
+     * Never fall back to a stale IP — that hangs / fails when the desktop app is off.
+     */
     suspend fun resolveTrustedJoin(
         context: Context,
         timeoutMs: Long = 2_500,
@@ -24,18 +28,22 @@ object TrustedCastResolver {
             GocastDiscovery(context).discover().first { hosts ->
                 hosts.any { it.instanceId == pc.instanceId }
             }.first { it.instanceId == pc.instanceId }
-        }
+        } ?: return null
 
-        val host = refreshed?.host ?: pc.host
-        val port = refreshed?.port ?: pc.port
-        val updated = if (refreshed != null && (refreshed.host != pc.host || refreshed.port != pc.port)) {
-            pc.copy(host = host, port = port).also { store.save(it) }
+        val updated = if (refreshed.host != pc.host || refreshed.port != pc.port ||
+            refreshed.displayName != pc.displayName
+        ) {
+            pc.copy(
+                displayName = refreshed.displayName.ifBlank { pc.displayName },
+                host = refreshed.host,
+                port = refreshed.port,
+            ).also { store.save(it) }
         } else {
             pc
         }
         return updated to JoinParams(
-            host = host,
-            port = port,
+            host = updated.host,
+            port = updated.port,
             token = pc.trustToken,
         )
     }

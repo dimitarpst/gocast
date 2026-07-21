@@ -55,6 +55,7 @@ fun GocastRoot(
     advertiser: GocastAdvertiser,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
+    onExitFullscreen: () -> Unit,
 ) {
     var kcefReady by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0f) }
@@ -150,6 +151,7 @@ fun GocastRoot(
                 },
                 isFullscreen = isFullscreen,
                 onToggleFullscreen = onToggleFullscreen,
+                onExitFullscreen = onExitFullscreen,
             )
         }
     }

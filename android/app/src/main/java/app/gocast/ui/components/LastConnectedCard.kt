@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -28,19 +29,37 @@ import app.gocast.domain.TrustedPc
 @Composable
 fun LastConnectedCard(
     pc: TrustedPc,
-    onClick: () -> Unit,
+    online: Boolean,
+    onCastClick: () -> Unit,
+    onOfflineClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
     busy: Boolean = false,
 ) {
+    val container = if (online) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val onContainer = if (online) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
     Card(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth(),
+        onClick = {
+            when {
+                busy -> Unit
+                online -> onCastClick()
+                else -> onOfflineClick()
+            }
+        },
+        enabled = !busy,
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (online) Modifier else Modifier.alpha(0.72f)),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
+        colors = CardDefaults.cardColors(containerColor = container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -48,14 +67,12 @@ fun LastConnectedCard(
                 text = stringResource(R.string.last_connected),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                color = onContainer.copy(alpha = 0.8f),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 12.dp, end = 12.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
-                    )
+                    .background(onContainer.copy(alpha = 0.12f))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
 
@@ -70,14 +87,21 @@ fun LastConnectedCard(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .background(
+                            if (online) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline,
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = pc.displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "P",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = if (online) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
                     )
                 }
 
@@ -90,21 +114,23 @@ fun LastConnectedCard(
                         text = pc.displayName,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = onContainer,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         softWrap = false,
                     )
-                    Text(
-                        text = if (busy) {
-                            stringResource(R.string.connecting)
-                        } else {
-                            stringResource(R.string.tap_to_cast)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
+                    if (busy || online) {
+                        Text(
+                            text = if (busy) {
+                                stringResource(R.string.connecting)
+                            } else {
+                                stringResource(R.string.tap_to_cast)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = onContainer.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                 }
             }
         }

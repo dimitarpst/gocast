@@ -199,11 +199,19 @@ fun ConnectScreen(
         }
     }
 
-    LaunchedEffect(mode) {
-        if (mode == ConnectMode.Discover) {
-            viewModel.startDiscovery()
-        } else if (mode != ConnectMode.EnterCode) {
-            viewModel.stopDiscovery()
+    LaunchedEffect(mode, trustedPc?.instanceId) {
+        when (mode) {
+            ConnectMode.Discover -> viewModel.startDiscovery()
+            // Keep listening on Home so Last connected can light up when the PC appears.
+            ConnectMode.Home -> {
+                if (trustedPc != null) {
+                    viewModel.startDiscovery()
+                } else {
+                    viewModel.stopDiscovery()
+                }
+            }
+            ConnectMode.EnterCode -> Unit
+            ConnectMode.Quality -> viewModel.stopDiscovery()
         }
     }
 
@@ -249,21 +257,33 @@ fun ConnectScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         when (mode) {
-            ConnectMode.Home -> HomeContent(
-                label = label,
-                connectionState = connectionState,
-                trustedPc = trustedPc,
-                canJoin = canJoin,
-                isActiveCast = isActiveCast,
-                castPaused = castUiState == CaptureService.CastUiState.Paused,
-                joinBusy = joinBusy,
-                onCastTrusted = { viewModel.castToTrustedPc() },
-                onScanQr = { qrScanner.launch(scannerConfig) },
-                onFindWifi = { mode = ConnectMode.Discover },
-                onResume = { viewModel.onResumeCastRequested() },
-                onStop = { viewModel.stopCast() },
-                onQuality = { mode = ConnectMode.Quality },
-            )
+            ConnectMode.Home -> {
+                val trustedOnline = trustedPc != null &&
+                    discoveredHosts.any { it.instanceId == trustedPc!!.instanceId }
+                HomeContent(
+                    label = label,
+                    connectionState = connectionState,
+                    trustedPc = trustedPc,
+                    trustedOnline = trustedOnline,
+                    canJoin = canJoin,
+                    isActiveCast = isActiveCast,
+                    castPaused = castUiState == CaptureService.CastUiState.Paused,
+                    joinBusy = joinBusy,
+                    onCastTrusted = { viewModel.castToTrustedPc() },
+                    onTrustedOffline = {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.last_connected_offline),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    },
+                    onScanQr = { qrScanner.launch(scannerConfig) },
+                    onFindWifi = { mode = ConnectMode.Discover },
+                    onResume = { viewModel.onResumeCastRequested() },
+                    onStop = { viewModel.stopCast() },
+                    onQuality = { mode = ConnectMode.Quality },
+                )
+            }
 
             ConnectMode.Discover -> DiscoverContent(
                 hosts = discoveredHosts,
@@ -320,11 +340,13 @@ private fun HomeContent(
     label: String,
     connectionState: ConnectionState,
     trustedPc: TrustedPc?,
+    trustedOnline: Boolean,
     canJoin: Boolean,
     isActiveCast: Boolean,
     castPaused: Boolean,
     joinBusy: Boolean,
     onCastTrusted: () -> Unit,
+    onTrustedOffline: () -> Unit,
     onScanQr: () -> Unit,
     onFindWifi: () -> Unit,
     onResume: () -> Unit,
@@ -393,12 +415,10 @@ private fun HomeContent(
             trustedPc?.let { pc ->
                 LastConnectedCard(
                     pc = pc,
-                    onClick = onCastTrusted,
+                    online = trustedOnline && canJoin,
+                    onCastClick = onCastTrusted,
+                    onOfflineClick = onTrustedOffline,
                     busy = joinBusy,
-                    enabled = !joinBusy && (
-                        connectionState is ConnectionState.Idle ||
-                            connectionState is ConnectionState.Failed
-                        ),
                 )
                 Spacer(Modifier.height(20.dp))
                 Text(

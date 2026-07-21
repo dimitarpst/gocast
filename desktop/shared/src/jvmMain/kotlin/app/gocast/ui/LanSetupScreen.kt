@@ -109,8 +109,9 @@ fun LanSetupScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "You'll see a normal Windows security prompt. Choose Yes — " +
-                            "nothing else installs, and no command window should flash.",
+                        text = "You'll see a Windows security prompt. Choose Yes, and if it asks " +
+                            "which networks, turn on both Private and Public — home Wi-Fi is often " +
+                            "marked Public.",
                         color = Color(0xFF7E8798),
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,

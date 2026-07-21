@@ -19,6 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gocast.domain.model.JoinSession
@@ -35,6 +40,7 @@ fun App(
     onRename: (String) -> Unit,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
+    onExitFullscreen: () -> Unit,
 ) {
     val phoneConnected by SignalingHub.phoneConnected.collectAsState()
     var showPairing by remember { mutableStateOf(true) }
@@ -49,11 +55,38 @@ fun App(
         }
     }
 
+    // Pairing is never fullscreen — drop out if we navigate back to QR.
+    LaunchedEffect(showPairing) {
+        if (showPairing && isFullscreen) {
+            onExitFullscreen()
+        }
+    }
+
     MaterialTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF12141A)),
+                .background(Color(0xFF12141A))
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    // Fullscreen keys only matter while actually casting.
+                    if (showPairing) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.Escape -> {
+                            if (isFullscreen) {
+                                onExitFullscreen()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        Key.F11 -> {
+                            onToggleFullscreen()
+                            true
+                        }
+                        else -> false
+                    }
+                },
         ) {
             if (showPairing) {
                 PairingScreen(
@@ -80,15 +113,14 @@ fun App(
                     url = "http://127.0.0.1:${session.port}/view",
                     modifier = Modifier.fillMaxSize(),
                 )
+                AppOverflowMenu(
+                    isFullscreen = isFullscreen,
+                    onToggleFullscreen = onToggleFullscreen,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+                )
             }
-
-            AppOverflowMenu(
-                isFullscreen = isFullscreen,
-                onToggleFullscreen = onToggleFullscreen,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
-            )
         }
     }
 }

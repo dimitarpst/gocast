@@ -161,6 +161,14 @@ fun PairingScreen(
                 )
                 Spacer(modifier = Modifier.height(28.dp))
                 PairingCodeHighlight(code = session.shortCode)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "${session.host}:${session.port}",
+                    color = FieldMuted,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     }

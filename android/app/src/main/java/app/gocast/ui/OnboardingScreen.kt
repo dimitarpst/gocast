@@ -1,5 +1,6 @@
 package app.gocast.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,8 +16,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,129 +26,190 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.gocast.R
 import kotlinx.coroutines.launch
 
-private data class OnboardingPage(
-    val title: String,
-    val body: String,
-)
-
+/**
+ * First-open orientation — brand-first, almost no reading.
+ * Research (and common practice): keep it skippable, visual, and under ~2 beats.
+ */
 @Composable
 fun OnboardingScreen(
     onFinished: () -> Unit,
 ) {
-    val pages = listOf(
-        OnboardingPage(
-            title = "Your phone, on your PC",
-            body = "gocast shows what you see and hear on your phone — on the computer — over the same Wi-Fi. No account. No cloud.",
-        ),
-        OnboardingPage(
-            title = "Connect in one step",
-            body = "Open gocast on the PC first. On your phone, scan the QR code, or find the PC on Wi-Fi and enter the short code.",
-        ),
-        OnboardingPage(
-            title = "Share your screen",
-            body = "When Android asks to start casting, allow it. Pause or stop anytime from the notification or this app.",
-        ),
-    )
-
-    val pagerState = rememberPagerState(pageCount = { pages.size })
+    val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
-    val lastPage = pagerState.currentPage == pages.lastIndex
+    val lastPage = pagerState.currentPage == 1
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF12141A), Color(0xFF1B2030), Color(0xFF0E1016)),
+                ),
+            ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            if (!lastPage) {
-                TextButton(onClick = onFinished) {
-                    Text("Skip")
-                }
-            }
-        }
-
-        HorizontalPager(
-            state = pagerState,
+        Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-        ) { page ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(horizontal = 28.dp, vertical = 12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
             ) {
-                Text(
-                    text = "gocast",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.height(28.dp))
-                Text(
-                    text = pages[page].title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = pages[page].body,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            pages.indices.forEach { index ->
-                val selected = index == pagerState.currentPage
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .size(if (selected) 8.dp else 6.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (selected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.outlineVariant,
-                        ),
-                )
-            }
-        }
-
-        Button(
-            onClick = {
-                if (lastPage) {
-                    onFinished()
-                } else {
-                    scope.launch {
-                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                if (!lastPage) {
+                    TextButton(onClick = onFinished) {
+                        Text("Skip", color = Color(0xFF9AA3B5))
                     }
                 }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-        ) {
-            Text(if (lastPage) "Get started" else "Next")
+            }
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) { page ->
+                when (page) {
+                    0 -> OnboardingHero()
+                    else -> OnboardingConnectHint()
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                repeat(2) { index ->
+                    val selected = index == pagerState.currentPage
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .size(if (selected) 8.dp else 6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (selected) Color(0xFF6EA8FE)
+                                else Color(0xFF3A4558),
+                            ),
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    if (lastPage) {
+                        onFinished()
+                    } else {
+                        scope.launch {
+                            pagerState.animateScrollToPage(1)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF6EA8FE),
+                    contentColor = Color(0xFF0E1016),
+                ),
+            ) {
+                Text(
+                    text = if (lastPage) "Get started" else "Next",
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun OnboardingHero() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.gocast_logo),
+            contentDescription = "gocast",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth(0.55f)
+                .height(72.dp),
+        )
+        Spacer(Modifier.height(28.dp))
+        Text(
+            text = "Your phone screen,\non your PC.",
+            color = Color(0xFFE8ECF5),
+            fontSize = 28.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            lineHeight = 34.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "Same Wi-Fi. Nothing else.",
+            color = Color(0xFF9AA3B5),
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingConnectHint() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        // Quiet visual stand-in for “look at the PC” — not a wall of instructions.
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(160.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFF1B2030)),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFE8ECF5)),
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "12  34",
+                    color = Color(0xFF6EA8FE),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 2.sp,
+                )
+            }
+        }
+        Spacer(Modifier.height(32.dp))
+        Text(
+            text = "Open gocast on the PC.\nScan the QR — or type the code.",
+            color = Color(0xFFE8ECF5),
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            lineHeight = 30.sp,
+        )
     }
 }
