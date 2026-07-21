@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open in gocast</title>
+  <meta name="description" content="Join a gocast session on your PC over Wi-Fi." />
+  <style>
+    :root {
+      --bg0: #0e1016;
+      --bg1: #12141a;
+      --bg2: #1b2030;
+      --text: #e8ecf5;
+      --muted: #9aa3b5;
+      --quiet: #7e8798;
+      --blue: #6ea8fe;
+      --line: #2a3142;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #1b2030 0%, transparent 55%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    main {
+      max-width: 28rem;
+      margin: 0 auto;
+      padding: 3.5rem 1.5rem 2rem;
+      text-align: center;
+    }
+    .mark {
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-size: 1.75rem;
+      margin: 0 0 1.5rem;
+    }
+    .mark span { color: var(--blue); }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 0.75rem;
+      letter-spacing: -0.02em;
+    }
+    p {
+      margin: 0 0 1rem;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.75rem;
+    }
+    a.btn {
+      display: inline-block;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    a.btn-primary {
+      background: var(--blue);
+      color: var(--bg0);
+    }
+    a.btn-secondary {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--line);
+    }
+    .meta {
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--quiet);
+      word-break: break-all;
+      font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="mark">go<span>cast</span></p>
+    <h1 id="title">Open this join link in gocast</h1>
+    <p id="blurb">
+      If the app is installed, tap the button below. Same Wi‑Fi as the PC —
+      no account, no cloud.
+    </p>
+    <div class="actions">
+      <a class="btn btn-primary" id="open-app" href="#">Open in gocast</a>
+      <a class="btn btn-secondary" id="get-app"
+         href="https://github.com/dimitarpst/gocast/releases">Get the Android app</a>
+    </div>
+    <p class="meta hidden" id="target"></p>
+  </main>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var a = params.get("a");
+      var t = params.get("t");
+      var open = document.getElementById("open-app");
+      var title = document.getElementById("title");
+      var blurb = document.getElementById("blurb");
+      var target = document.getElementById("target");
+
+      if (!a || !t) {
+        title.textContent = "This join link is incomplete";
+        blurb.textContent =
+          "Scan the QR on the PC again, or open gocast on your phone and use Find on Wi‑Fi.";
+        open.classList.add("hidden");
+        return;
+      }
+
+      var httpsJoin =
+        "https://cast.govrse.app/join?a=" +
+        encodeURIComponent(a) +
+        "&t=" +
+        encodeURIComponent(t);
+
+      // App Links primary path — same https URL the Android intent-filter verifies.
+      open.setAttribute("href", httpsJoin);
+      target.textContent = a;
+      target.classList.remove("hidden");
+
+      // Nudge installed app open on Android when the browser didn't auto-hand off.
+      var ua = navigator.userAgent || "";
+      if (/Android/i.test(ua)) {
+        var intent =
+          "intent://cast.govrse.app/join?a=" +
+          encodeURIComponent(a) +
+          "&t=" +
+          encodeURIComponent(t) +
+          "#Intent;scheme=https;package=app.gocast;S.browser_fallback_url=" +
+          encodeURIComponent(httpsJoin) +
+          ";end";
+        // Delay so verified App Links can win first when the OS supports them.
+        setTimeout(function () {
+          if (document.visibilityState === "visible") {
+            window.location.href = intent;
+          }
+        }, 400);
+      }
+    })();
+  </script>
+</body>
+</html>

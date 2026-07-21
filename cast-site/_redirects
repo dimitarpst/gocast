@@ -1,0 +1,4 @@
+# Cloudflare Pages / Netlify-style redirects for join deep links.
+# Keep query string so ?a=&t= survive.
+/join /join/index.html 200
+/join/ /join/index.html 200

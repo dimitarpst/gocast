@@ -32,9 +32,8 @@ Output (typical):
 
 ### LAN firewall (port 8765)
 
-Phones connect inbound to the PC on TCP **8765**. The packaged app:
+Phones connect inbound to the PC on TCP **8765**. The packaged app elevates once
+(UAC) and adds `netsh` Allow rules for `gocast.exe` + TCP 8765 on **all**
+profiles (`profile=any`) — home Wi‑Fi is often marked Public on laptops.
 
-1. Tries `netsh` on first launch to Allow `gocast.exe` + TCP 8765 on **private** networks (no PowerShell)
-2. If that cannot run elevated, Windows should still show the normal **Allow gocast on private networks?** dialog when the app first listens
-
-Install the MSI, launch gocast once, and Allow private networks if prompted.
+No PowerShell. Gradle/Java runs do not set these rules.

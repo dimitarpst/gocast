@@ -1,5 +1,74 @@
 <!DOCTYPE html>
-<html>
-<head><title>gocast</title></head>
-<body><p>Install gocast on your phone.</p></body>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gocast</title>
+  <meta name="description" content="Cast your Android phone screen to a Windows PC over Wi-Fi." />
+  <style>
+    :root {
+      --bg0: #0e1016;
+      --bg1: #12141a;
+      --text: #e8ecf5;
+      --muted: #9aa3b5;
+      --blue: #6ea8fe;
+      --line: #2a3142;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #1b2030 0%, transparent 55%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    main {
+      max-width: 28rem;
+      margin: 0 auto;
+      padding: 3.5rem 1.5rem 2rem;
+      text-align: center;
+    }
+    .mark {
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-size: 1.75rem;
+      margin: 0 0 1.5rem;
+    }
+    .mark span { color: var(--blue); }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 0.75rem;
+    }
+    p {
+      margin: 0 0 1rem;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    a.btn {
+      display: inline-block;
+      margin-top: 1rem;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      font-weight: 600;
+      background: var(--blue);
+      color: var(--bg0);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="mark">go<span>cast</span></p>
+    <h1>Your phone screen, on your PC</h1>
+    <p>
+      Same Wi‑Fi. Scan the QR in the desktop app, or open a
+      <code style="color:#c5cddb">/join</code> link from a friend.
+    </p>
+    <a class="btn" href="https://github.com/dimitarpst/gocast/releases">Download gocast</a>
+  </main>
+</body>
 </html>

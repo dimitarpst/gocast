@@ -1,0 +1,3 @@
+# Ensure Digital Asset Links are served with the type Android expects.
+/.well-known/assetlinks.json
+  Content-Type: application/json
