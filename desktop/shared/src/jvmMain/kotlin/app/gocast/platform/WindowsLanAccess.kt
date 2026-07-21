@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 /**
@@ -12,6 +13,9 @@ import kotlin.io.path.writeText
  * Silent non-elevated `netsh` does nothing. The Windows "Allow app?" dialog also
  * does not reliably appear for jpackage/`gocast.exe`. So we request elevation
  * (UAC) and add firewall Allow rules via `netsh` — never PowerShell.
+ *
+ * Fresh MSI installs always show the LAN setup screen once, even if a leftover
+ * firewall rule already exists from a previous install.
  */
 object WindowsLanAccess {
 
@@ -32,14 +36,31 @@ object WindowsLanAccess {
 
     fun status(): Status = statusRef.get()
 
+    fun isPackagedWindows(): Boolean =
+        isWindows() && isPackagedDistribution()
+
+    /** Show the LAN setup UI before QR on packaged Windows. */
+    fun shouldShowLanSetup(): Boolean {
+        if (!isPackagedWindows()) return false
+        if (!firstRunCompleted()) return true
+        return statusRef.get() == Status.Blocked
+    }
+
+    fun markFirstRunCompleted(prefsDir: Path = GocastDataDirs.root().toPath()) {
+        prefsDir.createDirectories()
+        firstRunFile(prefsDir).writeText("1")
+    }
+
     /** Cheap check at process start — no UAC. */
     fun refreshStatus() {
-        if (!isWindows() || !isPackagedDistribution()) {
+        if (!isPackagedWindows()) {
             statusRef.set(Status.NotApplicable)
             return
         }
+        GocastDataDirs.migrateLegacyHomePrefs()
+        val prefs = GocastDataDirs.root().toPath()
         if (rulesPresent()) {
-            markConfigured(Path.of(System.getProperty("user.home"), ".gocast"))
+            markFirewallOk(prefs)
             statusRef.set(Status.Allowed)
         } else {
             statusRef.set(Status.Blocked)
@@ -47,26 +68,27 @@ object WindowsLanAccess {
     }
 
     /**
-     * Shows UAC and adds Allow rules. Call from UI when [status] is [Status.Blocked].
+     * Shows UAC and adds Allow rules when needed. If rules already exist, returns
+     * [Status.Allowed] without prompting.
      */
     fun requestAllowNow(
-        prefsDir: Path = Path.of(System.getProperty("user.home"), ".gocast"),
+        prefsDir: Path = GocastDataDirs.root().toPath(),
     ): Status {
-        if (!isWindows() || !isPackagedDistribution()) {
+        if (!isPackagedWindows()) {
             statusRef.set(Status.NotApplicable)
             return status()
         }
         if (rulesPresent()) {
-            markConfigured(prefsDir)
+            markFirewallOk(prefsDir)
             statusRef.set(Status.Allowed)
             return status()
         }
         val ok = addRulesElevated(currentExePath())
         if (ok || rulesPresent()) {
-            markConfigured(prefsDir)
+            markFirewallOk(prefsDir)
             statusRef.set(Status.Allowed)
         } else {
-            runCatching { flagFile(prefsDir).toFile().delete() }
+            runCatching { firewallFlagFile(prefsDir).toFile().delete() }
             statusRef.set(Status.Blocked)
         }
         return status()
@@ -76,7 +98,8 @@ object WindowsLanAccess {
         System.getProperty("os.name").orEmpty().contains("windows", ignoreCase = true)
 
     private fun isPackagedDistribution(): Boolean {
-        if (!System.getProperty("compose.application.resources.dir").isNullOrBlank()) return true
+        // jpackage / installed MSI only. Do NOT treat compose.application.resources.dir
+        // alone — Gradle `run` sets that and would falsely skip / fake firewall state.
         if (!System.getProperty("jpackage.app-path").isNullOrBlank()) return true
         val cmd = ProcessHandle.current().info().command().orElse("")
         return cmd.endsWith("gocast.exe", ignoreCase = true)
@@ -89,16 +112,11 @@ object WindowsLanAccess {
         return cmd.takeIf { it.endsWith("gocast.exe", ignoreCase = true) }
     }
 
+    /**
+     * Port rule is required. Program-only Allow is not enough after reinstall /
+     * path changes, and does nothing for non-exe hosts.
+     */
     private fun rulesPresent(): Boolean {
-        val program = runNetshCapture(
-            "advfirewall", "firewall", "show", "rule", "name=$RULE_PROGRAM",
-        )
-        if (program.ok &&
-            program.output.contains(RULE_PROGRAM, ignoreCase = true) &&
-            !program.output.contains("No rules match", ignoreCase = true)
-        ) {
-            return true
-        }
         val port = runNetshCapture(
             "advfirewall", "firewall", "show", "rule", "name=$RULE_PORT",
         )
@@ -176,10 +194,15 @@ object WindowsLanAccess {
         }
     }
 
-    private fun flagFile(prefsDir: Path): Path = prefsDir.resolve("firewall-lan-ok")
+    private fun firewallFlagFile(prefsDir: Path): Path = prefsDir.resolve("firewall-lan-ok")
 
-    private fun markConfigured(prefsDir: Path) {
+    private fun firstRunFile(prefsDir: Path): Path = prefsDir.resolve("lan-setup-completed")
+
+    private fun firstRunCompleted(prefsDir: Path = GocastDataDirs.root().toPath()): Boolean =
+        firstRunFile(prefsDir).exists()
+
+    private fun markFirewallOk(prefsDir: Path) {
         prefsDir.createDirectories()
-        flagFile(prefsDir).writeText("1")
+        firewallFlagFile(prefsDir).writeText("1")
     }
 }

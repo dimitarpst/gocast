@@ -19,17 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gocast.domain.model.JoinSession
 import app.gocast.server.SignalingHub
 import app.gocast.server.ViewerCommands
-import app.gocast.ui.AppOverflowMenu
 import app.gocast.ui.PairingScreen
 import app.gocast.ui.ViewerPane
 
@@ -55,6 +49,18 @@ fun App(
         }
     }
 
+    // CEF steals focus — fullscreen is driven from the viewer HTML menu / F11 / Esc.
+    LaunchedEffect(Unit) {
+        ViewerCommands.toggleFullscreen.collect {
+            onToggleFullscreen()
+        }
+    }
+    LaunchedEffect(Unit) {
+        ViewerCommands.exitFullscreen.collect {
+            onExitFullscreen()
+        }
+    }
+
     // Pairing is never fullscreen — drop out if we navigate back to QR.
     LaunchedEffect(showPairing) {
         if (showPairing && isFullscreen) {
@@ -66,27 +72,7 @@ fun App(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF12141A))
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    // Fullscreen keys only matter while actually casting.
-                    if (showPairing) return@onPreviewKeyEvent false
-                    when (event.key) {
-                        Key.Escape -> {
-                            if (isFullscreen) {
-                                onExitFullscreen()
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        Key.F11 -> {
-                            onToggleFullscreen()
-                            true
-                        }
-                        else -> false
-                    }
-                },
+                .background(Color(0xFF12141A)),
         ) {
             if (showPairing) {
                 PairingScreen(
@@ -112,13 +98,6 @@ fun App(
                 ViewerPane(
                     url = "http://127.0.0.1:${session.port}/view",
                     modifier = Modifier.fillMaxSize(),
-                )
-                AppOverflowMenu(
-                    isFullscreen = isFullscreen,
-                    onToggleFullscreen = onToggleFullscreen,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp),
                 )
             }
         }

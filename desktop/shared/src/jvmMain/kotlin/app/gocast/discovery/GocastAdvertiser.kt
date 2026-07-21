@@ -15,12 +15,17 @@ class GocastAdvertiser {
 
     private var jmdns: JmDNS? = null
 
-    fun start(port: Int, instanceId: String, displayName: String) {
+    /**
+     * @param host Prefer the same address shown in the QR. When null, resolves again.
+     */
+    fun start(port: Int, instanceId: String, displayName: String, host: String? = null) {
         stop()
-        val lanIp = LocalIpResolver.resolve()
+        val lanIp = host
+            ?.takeIf { it.isNotBlank() && it != "127.0.0.1" }
+            ?: LocalIpResolver.resolve()
         val addr = runCatching { InetAddress.getByName(lanIp) }.getOrNull()
-            ?: runCatching { InetAddress.getLocalHost() }.getOrNull()
-        val dns = if (addr != null && !addr.isLoopbackAddress) {
+            ?.takeUnless { it.isLoopbackAddress }
+        val dns = if (addr != null) {
             JmDNS.create(addr, displayName)
         } else {
             JmDNS.create()

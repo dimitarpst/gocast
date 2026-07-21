@@ -2,7 +2,6 @@ package app.gocast.network
 
 import java.net.DatagramSocket
 import java.net.Inet4Address
-import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.NetworkInterface
 
@@ -14,55 +13,55 @@ object LocalIpResolver {
      * appears *before* Wi-Fi. Taking the first address puts a host-only IP
      * (e.g. 192.168.56.1) in the QR — the phone can never reach it.
      *
-     * Strategy:
-     * 1. Prefer the IPv4 Windows would use to reach the internet (UDP connect trick)
-     *    when that address is a real non-virtual LAN NIC.
-     * 2. Otherwise score remaining interfaces (Wi-Fi > Ethernet, skip virtual).
+     * Strategy (phone joins on Wi-Fi):
+     1. Prefer a real Wi-Fi IPv4 whenever one exists.
+     2. Else prefer the route-local IPv4 if it sits on a non-virtual NIC.
+     3. Else score remaining interfaces (Ethernet > other), skip virtual.
      */
     fun resolve(): String {
+        val candidates = collectIpv4Candidates()
+        if (candidates.isEmpty()) return "127.0.0.1"
+
+        candidates.filter { it.kind == IfaceKind.Wifi }
+            .maxByOrNull { it.score }
+            ?.let { return it.address }
+
         val routeIp = routeLocalIpv4()
-        if (routeIp != null &&
-            isUsableLanIpv4(routeIp) &&
-            !isVirtualOwnedIpv4(routeIp)
-        ) {
-            return routeIp
+        if (routeIp != null) {
+            candidates.find { it.address == routeIp }?.let { return it.address }
         }
 
-        data class Candidate(
-            val address: String,
-            val score: Int,
-        )
+        return candidates.maxByOrNull { it.score }!!.address
+    }
 
-        val candidates = mutableListOf<Candidate>()
+    private data class Candidate(
+        val address: String,
+        val score: Int,
+        val kind: IfaceKind,
+    )
 
+    private enum class IfaceKind { Wifi, Ethernet, Other }
+
+    private fun collectIpv4Candidates(): List<Candidate> {
+        val out = mutableListOf<Candidate>()
         for (networkInterface in NetworkInterface.getNetworkInterfaces().toList()) {
             if (!networkInterface.isUp || networkInterface.isLoopback) continue
             if (isVirtualAdapter(networkInterface.name, networkInterface.displayName)) continue
 
-            val ifaceScore = interfaceScore(networkInterface.name, networkInterface.displayName)
-            val ownsRoute = routeIp != null && networkInterfaceOwnsIpv4(networkInterface, routeIp)
-            val gatewayBonus = if (ownsRoute) 40 else 0
+            val kind = ifaceKind(networkInterface.name, networkInterface.displayName)
+            val ifaceScore = when (kind) {
+                IfaceKind.Wifi -> 100
+                IfaceKind.Ethernet -> 80
+                IfaceKind.Other -> 40
+            }
             for (address in networkInterface.inetAddresses.toList()) {
-                when (address) {
-                    is Inet4Address -> {
-                        if (address.isLoopbackAddress) continue
-                        val host = address.hostAddress ?: continue
-                        if (!isUsableLanIpv4(host)) continue
-                        candidates += Candidate(host, ifaceScore + ipv4Score(host) + gatewayBonus)
-                    }
-                    is Inet6Address -> {
-                        if (address.isLoopbackAddress || address.isLinkLocalAddress) continue
-                        val host = address.hostAddress?.substringBefore('%') ?: continue
-                        // Prefer IPv4 heavily; IPv6 only as last resort.
-                        candidates += Candidate(host, ifaceScore - 50)
-                    }
-                    else -> Unit
-                }
+                if (address !is Inet4Address || address.isLoopbackAddress) continue
+                val host = address.hostAddress ?: continue
+                if (!isUsableLanIpv4(host)) continue
+                out += Candidate(host, ifaceScore + ipv4Score(host), kind)
             }
         }
-
-        candidates.maxByOrNull { it.score }?.address?.let { return it }
-        return "127.0.0.1"
+        return out
     }
 
     /**
@@ -93,21 +92,40 @@ object LocalIpResolver {
     internal fun isVirtualAdapter(name: String, displayName: String): Boolean {
         val label = "$name $displayName".lowercase()
         val blocked = listOf(
-            "virtual", "vmware", "vbox", "virtualbox", "hyper-v", "vethernet",
-            "host-only", "docker", "wsl", "tun", "tap", "vpn", "nordlynx",
+            // Prefer whole tokens / product names over bare "virtual" so we don't
+            // over-match odd OEM labels.
+            "vmware", "vbox", "virtualbox", "hyper-v", "vethernet",
+            "host-only", "docker", "wsl", "nordlynx",
             "wireguard", "hamachi", "zerotier", "tailscale", "radmin", "loopback",
             "bluetooth", "isatap", "teredo", "microsoft wi-fi direct",
-            "pseudo-interface",
+            "pseudo-interface", "openvpn", "surfshark",
+            // VPN / tunnel adapters (substring match on common markers).
+            " vpn", "vpn ", "tun0", "tun1", "tap0", "tap-windows", "wintun",
         )
-        return blocked.any { label.contains(it) }
+        if (blocked.any { label.contains(it) }) return true
+        // Catch remaining *virtual* adapters (VirtualBox Host-Only, etc.) without
+        // treating every "virtual" substring in unrelated names as poison.
+        if ("virtualbox" in label || "host-only" in label) return true
+        if ("virtual" in label && ("adapter" in label || "ethernet" in label || "switch" in label)) {
+            return true
+        }
+        return false
     }
 
     internal fun interfaceScore(name: String, displayName: String): Int {
+        return when (ifaceKind(name, displayName)) {
+            IfaceKind.Wifi -> 100
+            IfaceKind.Ethernet -> 80
+            IfaceKind.Other -> 40
+        }
+    }
+
+    private fun ifaceKind(name: String, displayName: String): IfaceKind {
         val label = "$name $displayName".lowercase()
         return when {
-            "wi-fi" in label || "wifi" in label || "wlan" in label -> 100
-            "ethernet" in label || "local area connection" in label -> 80
-            else -> 40
+            "wi-fi" in label || "wifi" in label || "wlan" in label -> IfaceKind.Wifi
+            "ethernet" in label || "local area connection" in label -> IfaceKind.Ethernet
+            else -> IfaceKind.Other
         }
     }
 
@@ -118,24 +136,5 @@ object LocalIpResolver {
         // filter virtual adapters; keep a modest score.
         host.matches(Regex("""^172\.(1[6-9]|2\d|3[0-1])\..*""")) -> 10
         else -> 0
-    }
-
-    private fun isVirtualOwnedIpv4(host: String): Boolean {
-        for (networkInterface in NetworkInterface.getNetworkInterfaces().toList()) {
-            if (!networkInterface.isUp) continue
-            if (networkInterfaceOwnsIpv4(networkInterface, host)) {
-                return isVirtualAdapter(networkInterface.name, networkInterface.displayName)
-            }
-        }
-        return false
-    }
-
-    private fun networkInterfaceOwnsIpv4(
-        networkInterface: NetworkInterface,
-        host: String,
-    ): Boolean {
-        return networkInterface.inetAddresses.toList().any { addr ->
-            addr is Inet4Address && addr.hostAddress == host
-        }
     }
 }

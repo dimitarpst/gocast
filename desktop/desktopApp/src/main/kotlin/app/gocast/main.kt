@@ -48,7 +48,7 @@ fun main() {
         SessionGuard.displayName = created.displayName
         SessionGuard.replaceTrusted(identityStore.loadTrustedTokens())
         server.start(8765)
-        advertiser.start(8765, created.instanceId, created.displayName)
+        advertiser.start(8765, created.instanceId, created.displayName, created.host)
         created
     }
 

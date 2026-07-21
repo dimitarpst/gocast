@@ -1,5 +1,6 @@
 package app.gocast.trust
 
+import app.gocast.platform.GocastDataDirs
 import java.nio.file.Path
 import java.util.UUID
 import kotlin.io.path.createDirectories
@@ -10,7 +11,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class DesktopIdentityStore(
-    private val dir: Path = Path.of(System.getProperty("user.home"), ".gocast"),
+    private val dir: Path = GocastDataDirs.root().toPath(),
 ) {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val identityFile = dir.resolve("identity.json")

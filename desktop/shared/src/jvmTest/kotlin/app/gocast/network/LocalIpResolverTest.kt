@@ -26,8 +26,17 @@ class LocalIpResolverTest {
         assertTrue(
             LocalIpResolver.isVirtualAdapter("vEthernet (Default Switch)", "Hyper-V"),
         )
+        assertTrue(
+            LocalIpResolver.isVirtualAdapter(
+                "eth20",
+                "OpenVPN Data Channel Offload for Surfshark",
+            ),
+        )
         assertFalse(
             LocalIpResolver.isVirtualAdapter("wlan0", "Intel(R) Wi-Fi 6 AX200 160MHz"),
+        )
+        assertFalse(
+            LocalIpResolver.isVirtualAdapter("eth0", "Realtek Gaming 2.5GbE Family Controller"),
         )
     }
 

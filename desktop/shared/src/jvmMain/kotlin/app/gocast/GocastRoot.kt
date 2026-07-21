@@ -64,18 +64,24 @@ fun GocastRoot(
     var initError by remember { mutableStateOf<String?>(null) }
     var displayName by remember { mutableStateOf(session.displayName) }
     var liveSession by remember { mutableStateOf(session) }
-    // Packaged Windows with no firewall rule: gate QR until LAN setup finishes.
+    // Packaged Windows: always show LAN setup once after install (and again if
+    // the firewall rule is missing).
     var lanReady by remember {
-        mutableStateOf(WindowsLanAccess.status() != WindowsLanAccess.Status.Blocked)
+        mutableStateOf(!WindowsLanAccess.shouldShowLanSetup())
     }
 
     // Keep QR + mDNS on the real Wi-Fi address if VirtualBox/VPN wins at boot
-    // or the laptop joins Wi-Fi after launch.
+    // or the laptop joins Wi-Fi after launch. Debounced inside LanHostMonitor.
     LaunchedEffect(session.instanceId, session.port) {
         LanHostMonitor.watch(liveSession.host).collect { host ->
             liveSession = liveSession.copy(host = host)
             withContext(Dispatchers.IO) {
-                advertiser.start(liveSession.port, liveSession.instanceId, displayName)
+                advertiser.start(
+                    port = liveSession.port,
+                    instanceId = liveSession.instanceId,
+                    displayName = displayName,
+                    host = host,
+                )
             }
         }
     }
@@ -160,7 +166,12 @@ fun GocastRoot(
                     val updated = identityStore.updateDisplayName(next)
                     displayName = updated.displayName
                     SessionGuard.displayName = updated.displayName
-                    advertiser.start(liveSession.port, liveSession.instanceId, updated.displayName)
+                    advertiser.start(
+                        port = liveSession.port,
+                        instanceId = liveSession.instanceId,
+                        displayName = updated.displayName,
+                        host = liveSession.host,
+                    )
                 },
                 isFullscreen = isFullscreen,
                 onToggleFullscreen = onToggleFullscreen,

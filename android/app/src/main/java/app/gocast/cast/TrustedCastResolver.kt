@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Same target selection as in-app “tap to cast”: prefer a fresh mDNS address for
- * the last trusted PC, otherwise use the last known host/port.
+ * Same target selection as in-app “tap to cast”: only join when the last trusted
+ * PC is visible on Wi-Fi via mDNS. Never fall back to a stale IP.
  */
 object TrustedCastResolver {
 

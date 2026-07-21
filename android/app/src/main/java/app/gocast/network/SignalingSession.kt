@@ -8,6 +8,7 @@ import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -23,15 +24,20 @@ class SignalingSession(
     suspend fun open(host: String, port: Int, token: String): HelloResult {
         close()
         return try {
-            val ws = httpClient.webSocketSession("ws://${HostEndpoint.authority(host, port)}/ws")
+            val ws = withTimeoutOrNull(8_000) {
+                httpClient.webSocketSession("ws://${HostEndpoint.authority(host, port)}/ws")
+            } ?: return HelloResult.Failed(LanHealthProbe.explainFailure(host, port, null)).also {
+                close()
+            }
             session = ws
             ws.send(
                 Frame.Text(
                     json.encodeToString(HelloMessage(type = "hello", token = token, role = "phone")),
                 ),
             )
-            val frame = ws.incoming.receive() as? Frame.Text
-                ?: return HelloResult.Failed("No response from PC").also { close() }
+            val frame = withTimeoutOrNull(8_000) {
+                ws.incoming.receive() as? Frame.Text
+            } ?: return HelloResult.Failed("Timed out waiting for PC").also { close() }
             val text = frame.readText()
             when {
                 text == "ok" -> HelloResult.Ok()
@@ -45,16 +51,13 @@ class SignalingSession(
                         )
                     } else {
                         close()
-                        HelloResult.Failed("Server rejected token")
+                        HelloResult.Failed("Wrong code or QR — open gocast on the PC and try again.")
                     }
                 }
             }
-        } catch (_: java.net.ConnectException) {
+        } catch (e: Exception) {
             close()
-            HelloResult.Failed("Can't reach PC — same WiFi? Firewall?")
-        } catch (_: java.net.SocketTimeoutException) {
-            close()
-            HelloResult.Failed("Timed out waiting for PC")
+            HelloResult.Failed(LanHealthProbe.explainFailure(host, port, e))
         }
     }
 

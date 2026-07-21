@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,16 +42,26 @@ private enum class LanSetupPhase {
 }
 
 /**
- * First-run gate before QR pairing: explain LAN permission in plain language,
- * then run elevated firewall setup (UAC only — no visible CMD).
+ * Required first-run gate on packaged Windows before QR pairing.
+ * Always shown once after a fresh install; UAC only when firewall rules are missing.
  */
 @Composable
 fun LanSetupScreen(
     onReady: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var phase by remember { mutableStateOf(LanSetupPhase.Intro) }
+    val rulesAlreadyOk = remember {
+        WindowsLanAccess.status() == WindowsLanAccess.Status.Allowed
+    }
+    var phase by remember {
+        mutableStateOf(if (rulesAlreadyOk) LanSetupPhase.Success else LanSetupPhase.Intro)
+    }
     val scope = rememberCoroutineScope()
+
+    fun finish() {
+        WindowsLanAccess.markFirstRunCompleted()
+        onReady()
+    }
 
     fun startAllow() {
         scope.launch {
@@ -91,7 +100,7 @@ fun LanSetupScreen(
             when (phase) {
                 LanSetupPhase.Intro -> {
                     Text(
-                        text = "One quick Windows step",
+                        text = "Allow phone connections",
                         color = Color(0xFFE8ECF5),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -149,7 +158,7 @@ fun LanSetupScreen(
 
                 LanSetupPhase.Success -> {
                     Text(
-                        text = "You're set",
+                        text = if (rulesAlreadyOk) "Network access is ready" else "You're set",
                         color = Color(0xFFE8ECF5),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -166,7 +175,7 @@ fun LanSetupScreen(
                     )
                     Spacer(Modifier.height(28.dp))
                     Button(
-                        onClick = onReady,
+                        onClick = { finish() },
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BrandBlue,
@@ -204,12 +213,6 @@ fun LanSetupScreen(
                         ),
                     ) {
                         Text("Try again")
-                    }
-                    TextButton(onClick = onReady) {
-                        Text(
-                            text = "Skip for now",
-                            color = Color(0xFF7E8798),
-                        )
                     }
                 }
             }

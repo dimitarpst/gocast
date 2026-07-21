@@ -73,6 +73,14 @@ class KtorGocastServer(
                 ViewerCommands.requestShowPairing()
                 call.respondText("ok")
             }
+            post("/__gocast/toggle-fullscreen") {
+                ViewerCommands.requestToggleFullscreen()
+                call.respondText("ok")
+            }
+            post("/__gocast/exit-fullscreen") {
+                ViewerCommands.requestExitFullscreen()
+                call.respondText("ok")
+            }
             webSocket("/ws") {
                 var role: String? = null
                 try {

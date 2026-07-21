@@ -24,19 +24,32 @@ object ViewerPage {
       inset: 0;
       background: #000;
     }
-    video {
+    /*
+     * CEF paints hardware-decoded <video> above HTML no matter the z-index.
+     * Keep <video> as a tiny offscreen decoder and blit frames to <canvas>.
+     */
+    #video {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+      left: -100px;
+      top: -100px;
+    }
+    #stage {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: contain;
       background: #000;
+      z-index: 0;
     }
     #status {
       position: absolute;
       left: 12px;
       bottom: 12px;
-      z-index: 2;
+      z-index: 20;
       opacity: 0.7;
       font-size: 12px;
       background: rgba(0,0,0,0.45);
@@ -48,7 +61,7 @@ object ViewerPage {
       display: none;
       position: absolute;
       inset: 0;
-      z-index: 5;
+      z-index: 15;
       align-items: center;
       justify-content: center;
       flex-direction: column;
@@ -79,7 +92,7 @@ object ViewerPage {
       position: absolute;
       top: 14px;
       left: 14px;
-      z-index: 12;
+      z-index: 30;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -188,7 +201,7 @@ object ViewerPage {
       position: absolute;
       top: 14px;
       right: 14px;
-      z-index: 10;
+      z-index: 30;
       box-sizing: border-box;
       width: 40px;
       height: 40px;
@@ -213,7 +226,7 @@ object ViewerPage {
       position: absolute;
       top: 14px;
       right: 62px;
-      z-index: 10;
+      z-index: 30;
       box-sizing: border-box;
       width: 40px;
       height: 40px;
@@ -238,7 +251,7 @@ object ViewerPage {
       position: absolute;
       top: 60px;
       right: 14px;
-      z-index: 11;
+      z-index: 31;
       min-width: 200px;
       padding: 6px;
       border-radius: 12px;
@@ -263,6 +276,7 @@ object ViewerPage {
 </head>
 <body>
   <div id="wrap">
+    <canvas id="stage" aria-hidden="true"></canvas>
     <video id="video" autoplay playsinline muted></video>
     <audio id="cast-audio" autoplay></audio>
     <div id="paused" aria-live="polite">
@@ -283,6 +297,7 @@ object ViewerPage {
             title="Screen stuck? Try again"></button>
     <button id="fab" type="button" aria-label="Menu" title="Menu">☰</button>
     <div id="menu" role="menu">
+      <button type="button" id="btn-fullscreen">Full screen</button>
       <button type="button" id="btn-pairing">Show pairing again</button>
       <button type="button" id="btn-disconnect">Disconnect</button>
     </div>
@@ -292,6 +307,8 @@ object ViewerPage {
     const statusEl = document.getElementById('status');
     const pausedEl = document.getElementById('paused');
     const video = document.getElementById('video');
+    const stage = document.getElementById('stage');
+    const stageCtx = stage.getContext('2d');
     // Picture and sound on separate elements — A/V on one <video> freezes KCEF on frame 1.
     const audio = document.getElementById('cast-audio');
     const fab = document.getElementById('fab');
@@ -312,8 +329,48 @@ object ViewerPage {
     let videoStream = null;
     let audioStream = null;
     let streamPaused = false;
+    let paintRunning = false;
 
     function setStatus(text) { statusEl.textContent = text; }
+
+    function resizeStage() {
+      const dpr = window.devicePixelRatio || 1;
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      if (w < 1 || h < 1) return;
+      stage.width = Math.round(w * dpr);
+      stage.height = Math.round(h * dpr);
+      stageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function paintFrame() {
+      if (!paintRunning) return;
+      requestAnimationFrame(paintFrame);
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (!vw || !vh) return;
+      const cw = stage.clientWidth;
+      const ch = stage.clientHeight;
+      if (cw < 1 || ch < 1) return;
+      const scale = Math.min(cw / vw, ch / vh);
+      const dw = vw * scale;
+      const dh = vh * scale;
+      const dx = (cw - dw) / 2;
+      const dy = (ch - dh) / 2;
+      stageCtx.fillStyle = '#000';
+      stageCtx.fillRect(0, 0, cw, ch);
+      stageCtx.drawImage(video, dx, dy, dw, dh);
+    }
+
+    function startPaint() {
+      if (paintRunning) return;
+      paintRunning = true;
+      resizeStage();
+      requestAnimationFrame(paintFrame);
+    }
+
+    window.addEventListener('resize', resizeStage);
+    resizeStage();
 
     function setStreamPaused(paused) {
       streamPaused = paused;
@@ -404,6 +461,29 @@ object ViewerPage {
       postAction('/__gocast/disconnect');
     });
 
+    let fullscreen = false;
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    function setFullscreenUi(on) {
+      fullscreen = on;
+      btnFullscreen.textContent = on ? 'Exit full screen' : 'Full screen';
+    }
+    btnFullscreen.addEventListener('click', () => {
+      menu.classList.remove('open');
+      setFullscreenUi(!fullscreen);
+      postAction('/__gocast/toggle-fullscreen');
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F11') {
+        e.preventDefault();
+        setFullscreenUi(!fullscreen);
+        postAction('/__gocast/toggle-fullscreen');
+      } else if (e.key === 'Escape' && fullscreen) {
+        e.preventDefault();
+        setFullscreenUi(false);
+        postAction('/__gocast/exit-fullscreen');
+      }
+    });
+
     let pc = null;
 
     function wirePeerConnection() {
@@ -426,6 +506,7 @@ object ViewerPage {
           video.muted = true;
           video.volume = 0;
           playEl(video);
+          startPaint();
         } else if (kind === 'audio') {
           if (!audioStream) audioStream = new MediaStream();
           if (!audioStream.getTracks().includes(event.track)) {
