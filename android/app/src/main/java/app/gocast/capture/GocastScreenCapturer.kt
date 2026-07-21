@@ -37,6 +37,10 @@ class GocastScreenCapturer(
     private var isDisposed = false
     private var numCapturedFrames = 0L
 
+    /** Live MediaProjection after [startCapture]; shared with system audio capture. */
+    @Synchronized
+    fun mediaProjectionOrNull(): MediaProjection? = mediaProjection
+
     @Synchronized
     override fun initialize(
         surfaceTextureHelper: SurfaceTextureHelper,

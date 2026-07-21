@@ -3,7 +3,9 @@ package app.gocast.capture
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.Manifest
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -182,7 +184,13 @@ class CaptureService : Service() {
             return
         }
 
-        publisher = WebRtcPublisher(factory, track, serviceScope, next).also { it.start() }
+        publisher = WebRtcPublisher(
+            factory,
+            track,
+            serviceScope,
+            next,
+            audioTrack = session.audioTrack,
+        ).also { it.start() }
         appliedQuality = next
         setMediaActive(applicationContext, true)
         showForegroundNotification()
@@ -222,7 +230,13 @@ class CaptureService : Service() {
         if (factory != null && track != null) {
             val quality = CastQualityStore.load(applicationContext)
             appliedQuality = quality
-            publisher = WebRtcPublisher(factory, track, serviceScope, quality).also { it.start() }
+            publisher = WebRtcPublisher(
+                factory,
+                track,
+                serviceScope,
+                quality,
+                audioTrack = session.audioTrack,
+            ).also { it.start() }
             setMediaActive(applicationContext, true)
         } else {
             Log.e(TAG, "Missing factory/track after capturer start")
@@ -237,11 +251,21 @@ class CaptureService : Service() {
             CaptureNotifications.casting(this)
         }
         try {
+            val hasMic = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO,
+            ) == PackageManager.PERMISSION_GRANTED
+            val types = if (hasMic) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            } else {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            }
             ServiceCompat.startForeground(
                 this,
                 CaptureNotifications.NOTIFICATION_ID,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
+                types,
             )
         } catch (e: Exception) {
             Log.e(TAG, "startForeground failed", e)

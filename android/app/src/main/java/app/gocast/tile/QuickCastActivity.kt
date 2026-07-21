@@ -3,11 +3,13 @@ package app.gocast.tile
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import app.gocast.MainActivity
 import app.gocast.R
@@ -29,10 +31,6 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 class QuickCastActivity : ComponentActivity() {
 
-    private val notificationPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { /* continue either way */ }
-
     private val captureLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -44,6 +42,12 @@ class QuickCastActivity : ComponentActivity() {
             CastConnection.stop()
         }
         finish()
+    }
+
+    private val castPrepPermissions = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        captureLauncher.launch(CaptureConsent.createIntent(this))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,10 +102,23 @@ class QuickCastActivity : ComponentActivity() {
                 return@launch
             }
 
+            launchCaptureConsent()
+        }
+    }
+
+    private fun launchCaptureConsent() {
+        val needed = buildList {
             if (Build.VERSION.SDK_INT >= 33) {
-                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                add(Manifest.permission.POST_NOTIFICATIONS)
             }
-            captureLauncher.launch(CaptureConsent.createIntent(this@QuickCastActivity))
+            add(Manifest.permission.RECORD_AUDIO)
+        }.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (needed.isEmpty()) {
+            captureLauncher.launch(CaptureConsent.createIntent(this))
+        } else {
+            castPrepPermissions.launch(needed.toTypedArray())
         }
     }
 

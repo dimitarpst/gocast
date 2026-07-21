@@ -1,6 +1,7 @@
 package app.gocast.ui
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.view.WindowManager
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -94,9 +96,13 @@ fun ConnectScreen(
         viewModel.onCaptureConsentResult(result.resultCode, result.data)
     }
 
-    val notificationPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { /* ignore result — continue either way */ }
+    // Notifications + RECORD_AUDIO (needed for system playback capture), then
+    // the MediaProjection sheet. Denial still continues — video-only cast works.
+    val castPrepPermissions = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        captureLauncher.launch(CaptureConsent.createIntent(context))
+    }
 
     val scanInvalidMessage = stringResource(R.string.scan_qr_invalid)
     val cameraDeniedMessage = stringResource(R.string.scan_qr_camera_denied)
@@ -139,10 +145,20 @@ fun ConnectScreen(
             viewModel.events.collect { event ->
                 when (event) {
                     CastEvent.RequestCaptureConsent -> {
-                        if (Build.VERSION.SDK_INT >= 33) {
-                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        val needed = buildList {
+                            if (Build.VERSION.SDK_INT >= 33) {
+                                add(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            add(Manifest.permission.RECORD_AUDIO)
+                        }.filter {
+                            ContextCompat.checkSelfPermission(context, it) !=
+                                PackageManager.PERMISSION_GRANTED
                         }
-                        captureLauncher.launch(CaptureConsent.createIntent(context))
+                        if (needed.isEmpty()) {
+                            captureLauncher.launch(CaptureConsent.createIntent(context))
+                        } else {
+                            castPrepPermissions.launch(needed.toTypedArray())
+                        }
                     }
                 }
             }

@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# Keep WebRtcAudioRecord.audioRecord for system-playback AudioRecord swap.
+-keepclassmembers class org.webrtc.audio.WebRtcAudioRecord {
+    private android.media.AudioRecord audioRecord;
+}

@@ -7,3 +7,8 @@ desktop/desktopApp/kcef-bundle/
 desktop/desktopApp/kcef-cache/
 **/kcef-bundle/
 **/kcef-cache/
+
+# Accidental WebRTC AAR extracts (not project source)
+.tmp-webrtc-src/
+**/.tmp-webrtc-src/
+/main/

@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.webrtc.AudioTrack
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStreamTrack
@@ -28,6 +29,7 @@ class WebRtcPublisher(
     private val videoTrack: VideoTrack,
     private val scope: CoroutineScope,
     quality: CastQualitySettings,
+    private val audioTrack: AudioTrack? = null,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     @Volatile
@@ -191,6 +193,7 @@ class WebRtcPublisher(
         }
         peerConnection = pc
         pc.addTrack(videoTrack, listOf("gocast"))
+        audioTrack?.let { pc.addTrack(it, listOf("gocast")) }
         applyCodecPreference(pc)
         applyVideoEncoding(pc)
         // BWE start/min/max — without this WebRTC ramps up from ~300 kbps and

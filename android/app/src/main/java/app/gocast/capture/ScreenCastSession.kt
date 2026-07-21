@@ -1,22 +1,31 @@
 package app.gocast.capture
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.media.projection.MediaProjection
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import app.gocast.settings.CastQualitySettings
 import app.gocast.settings.CastQualityStore
+import org.webrtc.AudioSource
+import org.webrtc.AudioTrack
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
+import org.webrtc.MediaConstraints
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.SurfaceTextureHelper
 import org.webrtc.VideoCapturer
 import org.webrtc.VideoSource
 import org.webrtc.VideoTrack
+import org.webrtc.audio.JavaAudioDeviceModule
+import org.webrtc.audio.SystemPlaybackAudioCapture
 
 class ScreenCastSession(
     private val appContext: Context,
@@ -28,9 +37,13 @@ class ScreenCastSession(
 
     private var eglBase: EglBase? = null
     private var factory: PeerConnectionFactory? = null
+    private var audioDeviceModule: JavaAudioDeviceModule? = null
+    private var systemAudio: SystemPlaybackAudioCapture? = null
+    private var localPlaybackMute: LocalPlaybackMute? = null
     private var capturer: VideoCapturer? = null
     private var surfaceHelper: SurfaceTextureHelper? = null
     private var videoSource: VideoSource? = null
+    private var audioSource: AudioSource? = null
     private var displayListener: DisplayManager.DisplayListener? = null
     private var lastWidth = 0
     private var lastHeight = 0
@@ -40,6 +53,9 @@ class ScreenCastSession(
     private var stopping = false
 
     var videoTrack: VideoTrack? = null
+        private set
+
+    var audioTrack: AudioTrack? = null
         private set
 
     val peerConnectionFactory: PeerConnectionFactory?
@@ -113,7 +129,58 @@ class ScreenCastSession(
         val egl = EglBase.create()
         eglBase = egl
 
-        val pcFactory = PeerConnectionFactory.builder()
+        val canCaptureAudio = ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val playbackCapture = if (canCaptureAudio) {
+            SystemPlaybackAudioCapture().also { systemAudio = it }
+        } else {
+            Log.w(TAG, "RECORD_AUDIO denied — video-only cast")
+            // Silent permission denials are the #1 cause of "audio just doesn't
+            // work" reports — sideloaded APKs commonly get RECORD_AUDIO grants
+            // silently blocked by Android's Restricted Settings. Surface it.
+            mainHandler.post {
+                Toast.makeText(
+                    appContext,
+                    "Casting without audio — mic permission not granted. " +
+                        "If this app was sideloaded, check Settings > Apps > gocast > " +
+                        "(3-dot menu) Allow restricted settings, then re-enable Microphone.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+            systemAudio = null
+            null
+        }
+
+        val adm = if (playbackCapture != null) {
+            JavaAudioDeviceModule.builder(appContext)
+                .setUseHardwareAcousticEchoCanceler(false)
+                .setUseHardwareNoiseSuppressor(false)
+                .setAudioRecordStateCallback(
+                    object : JavaAudioDeviceModule.AudioRecordStateCallback {
+                        override fun onWebRtcAudioRecordStart() {
+                            val module = audioDeviceModule ?: return
+                            playbackCapture.replaceWebRtcMic(module)
+                        }
+
+                        override fun onWebRtcAudioRecordStop() = Unit
+                    },
+                )
+                .createAudioDeviceModule()
+                .also {
+                    // Send-only cast — mute WebRTC playout so a local AudioTrack
+                    // doesn't steal hardware volume keys from our MediaSession.
+                    it.setSpeakerMute(true)
+                    audioDeviceModule = it
+                }
+        } else {
+            audioDeviceModule = null
+            null
+        }
+
+        val factoryBuilder = PeerConnectionFactory.builder()
             .setVideoEncoderFactory(
                 DefaultVideoEncoderFactory(
                     egl.eglBaseContext,
@@ -124,7 +191,11 @@ class ScreenCastSession(
             .setVideoDecoderFactory(
                 DefaultVideoDecoderFactory(egl.eglBaseContext),
             )
-            .createPeerConnectionFactory()
+        if (adm != null) {
+            factoryBuilder.setAudioDeviceModule(adm)
+        }
+        val pcFactory = factoryBuilder.createPeerConnectionFactory()
+        // ADM is retained by native until we release it in disposeWebRtcStack.
         factory = pcFactory
 
         val screenCapturer = existingCapturer ?: GocastScreenCapturer(
@@ -164,6 +235,30 @@ class ScreenCastSession(
         val track = pcFactory.createVideoTrack("gocast_screen", source)
         track.setEnabled(true)
         videoTrack = track
+
+        if (playbackCapture != null) {
+            val projection = screenCapturer.mediaProjectionOrNull()
+            if (projection != null) {
+                playbackCapture.bindProjection(projection)
+                val aSource = pcFactory.createAudioSource(MediaConstraints())
+                audioSource = aSource
+                val aTrack = pcFactory.createAudioTrack("gocast_system_audio", aSource)
+                aTrack.setEnabled(true)
+                audioTrack = aTrack
+                // Mute phone speakers; PC volume is the viewer slider only.
+                LocalPlaybackMute(appContext).also {
+                    localPlaybackMute = it
+                    it.start()
+                }
+            } else {
+                Log.w(TAG, "MediaProjection null after startCapture — skipping audio")
+                audioTrack = null
+                audioSource = null
+            }
+        } else {
+            audioTrack = null
+            audioSource = null
+        }
     }
 
     private fun registerDisplayListener() {
@@ -232,6 +327,34 @@ class ScreenCastSession(
     }
 
     private fun disposeWebRtcStack(disposeCapturer: Boolean) {
+        try {
+            localPlaybackMute?.stop()
+        } catch (e: Exception) {
+            Log.w(TAG, "localPlaybackMute stop failed", e)
+        }
+        localPlaybackMute = null
+
+        try {
+            systemAudio?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "systemAudio release failed", e)
+        }
+        systemAudio = null
+
+        try {
+            audioTrack?.dispose()
+        } catch (e: Exception) {
+            Log.w(TAG, "audioTrack dispose failed", e)
+        }
+        audioTrack = null
+
+        try {
+            audioSource?.dispose()
+        } catch (e: Exception) {
+            Log.w(TAG, "audioSource dispose failed", e)
+        }
+        audioSource = null
+
         if (disposeCapturer) {
             try {
                 capturer?.dispose()
@@ -268,6 +391,13 @@ class ScreenCastSession(
             Log.w(TAG, "factory dispose failed", e)
         }
         factory = null
+
+        try {
+            audioDeviceModule?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "ADM release failed", e)
+        }
+        audioDeviceModule = null
 
         try {
             eglBase?.release()
