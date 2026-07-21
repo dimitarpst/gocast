@@ -10,6 +10,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.gocast.discovery.GocastAdvertiser
 import app.gocast.domain.JvmSessionFactory
+import app.gocast.platform.WindowsLanAccess
 import app.gocast.server.KtorGocastServer
 import app.gocast.server.SessionGuard
 import app.gocast.trust.DesktopIdentityStore
@@ -18,6 +19,11 @@ import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 
 fun main() {
+    // Packaged Windows builds: open LAN before we bind so phones can connect.
+    // Gradle run skips this; the OS Allow dialog still appears on first listen
+    // if netsh could not add a rule without elevation.
+    WindowsLanAccess.ensureInboundAccess()
+
     val identityStore = DesktopIdentityStore()
     val server = KtorGocastServer(identityStore)
     val advertiser = GocastAdvertiser()
