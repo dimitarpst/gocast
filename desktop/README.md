@@ -10,6 +10,18 @@ Compose Desktop app for Windows (primary), with optional Linux/macOS packages la
 
 Gradle/Java runs do **not** show the LAN setup gate or write firewall rules. That is expected.
 
+### Viewer engine
+
+The desktop viewer is **WebView2** only (system Edge via Wry / `kdroidfilter:composewebview`).
+No bundled Chromium / KCEF.
+
+Optional autoplay for WebView2 (Gradle `run` sets this; for a packaged exe set it
+yourself before launch if needed):
+
+```bash
+set WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--autoplay-policy=no-user-gesture-required
+```
+
 ## Package Windows MSI
 
 Requires JDK 17+ with `jpackage`, and **WiX Toolset 3.x** (`candle`/`light` on `PATH`).
@@ -28,7 +40,7 @@ Then:
 
 Output (typical):
 
-`desktopApp/build/compose/binaries/main/msi/gocast-1.0.0.msi`
+`desktopApp/build/compose/binaries/main/msi/gocast-1.0.1.msi`
 
 The MSI is branded as **gocast** (publisher, Start Menu group, shortcut, description). Packaging also injects an uninstall custom action that runs `gocast-cleanup.cmd`.
 
@@ -43,5 +55,5 @@ No PowerShell for end users. Gradle/Java runs do not set these rules.
 Uninstalling the MSI runs `resources\gocast-cleanup.cmd`, which removes:
 
 - Firewall rules named `gocast` and `gocast TCP 8765`
-- `%LOCALAPPDATA%\gocast` (viewer engine, identity, prefs) for each Windows user profile
+- `%LOCALAPPDATA%\gocast` (identity, prefs; older installs may also have leftover `kcef-bundle`) for each Windows user profile
 - Legacy `%USERPROFILE%\.gocast` if present

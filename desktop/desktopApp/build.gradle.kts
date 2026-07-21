@@ -22,12 +22,14 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "app.gocast.MainKt"
+        // Wry/WebView2 (kdroidfilter composewebview) needs Panama/FFM native access.
+        jvmArgs += "--enable-native-access=ALL-UNNAMED"
 
         nativeDistributions {
             // Windows release focus: MSI. Keep Deb/Dmg available for future.
             targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "gocast"
-            packageVersion = "1.0.0"
+            packageVersion = "1.0.1"
             // ASCII only — WiX/jpackage mangles fancy dashes and copyright symbols.
             description = "gocast — cast your Android phone screen to this PC over Wi-Fi"
             copyright = "Copyright 2026 gocast contributors. MIT License."
@@ -43,7 +45,7 @@ compose.desktop {
                 dirChooser = true
                 // Stable across releases so MSI upgrades replace the previous install.
                 upgradeUuid = "7E3A9C2B-5F14-4D8A-9B6E-1C0D4A8F2E75"
-                msiPackageVersion = "1.0.0"
+                msiPackageVersion = "1.0.1"
                 installationPath = "gocast"
             }
             linux {
@@ -65,6 +67,7 @@ afterEvaluate {
         jvmArgs(
             "--add-opens", "java.desktop/sun.awt=ALL-UNNAMED",
             "--add-opens", "java.desktop/java.awt.peer=ALL-UNNAMED",
+            "--enable-native-access=ALL-UNNAMED",
         )
         if (System.getProperty("os.name").contains("Mac", ignoreCase = true)) {
             jvmArgs(
@@ -72,6 +75,12 @@ afterEvaluate {
                 "--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
             )
         }
+
+        // WebView2 autoplay without a prior click (Gradle run).
+        environment(
+            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+            "--autoplay-policy=no-user-gesture-required",
+        )
     }
 
     // Ship uninstall wipe script into $APPDIR/resources (compose app resources).

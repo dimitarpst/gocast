@@ -1,5 +1,6 @@
 package app.gocast.cast
 
+import android.app.Activity
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
@@ -133,7 +134,20 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onCaptureConsentResult(resultCode: Int, data: Intent?) {
-        captureGate.onConsentResult(getApplication(), resultCode, data)
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            captureGate.onConsentResult(getApplication(), resultCode, data)
+            return
+        }
+        // MediaProjection cancelled/denied.
+        captureGate.reset()
+        val wasPaused =
+            CaptureService.castUiState.value == CaptureService.CastUiState.Paused
+        if (!wasPaused) {
+            // Initial consent declined — drop signaling so PC leaves "waiting for offer".
+            // (Resume-from-pause cancel keeps the paused session, same as ResumeCastActivity.)
+            CastConnection.stop()
+        }
+        _joinBusy.value = false
     }
 
     /** Same as notification Stop — end capture and drop the PC link. */

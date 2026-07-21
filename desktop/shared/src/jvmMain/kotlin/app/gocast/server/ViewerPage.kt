@@ -309,7 +309,7 @@ object ViewerPage {
     const video = document.getElementById('video');
     const stage = document.getElementById('stage');
     const stageCtx = stage.getContext('2d');
-    // Picture and sound on separate elements — A/V on one <video> freezes KCEF on frame 1.
+    // Picture and sound on separate elements — A/V on one <video> can freeze on frame 1.
     const audio = document.getElementById('cast-audio');
     const fab = document.getElementById('fab');
     const menu = document.getElementById('menu');

@@ -22,13 +22,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,7 +42,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -65,6 +62,8 @@ import app.gocast.domain.JoinUrlParser
 import app.gocast.domain.TrustedPc
 import app.gocast.ui.components.DiscoveredHostCard
 import app.gocast.ui.components.LastConnectedCard
+import app.gocast.ui.components.PAIRING_CODE_LENGTH
+import app.gocast.ui.components.PairingCodeInput
 import app.gocast.ui.quality.QualitySettingsScreen
 import io.github.g00fy2.quickie.QRResult
 import io.github.g00fy2.quickie.ScanCustomCode
@@ -245,8 +244,10 @@ fun ConnectScreen(
 
     val canJoin = connectionState is ConnectionState.Idle ||
         connectionState is ConnectionState.Failed
-    val isActiveCast = connectionState is ConnectionState.Connected ||
-        connectionState is ConnectionState.Reconnecting
+    // "Casting" / "Stop casting" only after MediaProjection is granted (or while paused).
+    // WebSocket Connected alone is not active casting — consent may still be pending.
+    val isActiveCast = castUiState == CaptureService.CastUiState.Casting ||
+        castUiState == CaptureService.CastUiState.Paused
 
     Column(
         modifier = Modifier
@@ -302,12 +303,13 @@ fun ConnectScreen(
                 host = selectedHost,
                 codeInput = codeInput,
                 onCodeChange = { raw ->
-                    codeInput = raw.uppercase().filter { ch -> ch.isLetterOrDigit() }.take(4)
+                    codeInput = raw.uppercase().filter { ch -> ch.isLetterOrDigit() }
+                        .take(PAIRING_CODE_LENGTH)
                 },
                 canJoin = canJoin,
                 onConnect = {
                     val target = selectedHost ?: return@EnterCodeContent
-                    if (codeInput.length < 4) {
+                    if (codeInput.length < PAIRING_CODE_LENGTH) {
                         Toast.makeText(
                             context,
                             context.getString(R.string.code_too_short),
@@ -630,21 +632,17 @@ private fun EnterCodeContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(20.dp))
-        OutlinedTextField(
+        Spacer(Modifier.height(28.dp))
+        PairingCodeInput(
             value = codeInput,
             onValueChange = onCodeChange,
-            label = { Text(stringResource(R.string.pairing_code)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Characters,
-            ),
+            length = PAIRING_CODE_LENGTH,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
         Button(
             onClick = onConnect,
-            enabled = canJoin && host != null && codeInput.length == 4,
+            enabled = canJoin && host != null && codeInput.length == PAIRING_CODE_LENGTH,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.connect))

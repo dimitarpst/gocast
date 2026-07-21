@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.gocast.domain.ShortCodeGenerator
 import app.gocast.domain.model.JoinSession
 import app.gocast.qr.QrCodeEncoder
 
@@ -51,6 +53,7 @@ private val FieldBorder = Color(0xFF2A3142)
 private val FieldText = Color(0xFFE8ECF5)
 private val FieldMuted = Color(0xFF7E8798)
 private val BrandBlue = Color(0xFF6EA8FE)
+private val CodeBoxShape = RoundedCornerShape(8.dp)
 
 @Composable
 fun PairingScreen(
@@ -174,13 +177,16 @@ fun PairingScreen(
     }
 }
 
-/** Short code styled like the rename field — quiet outline, same corner radius. */
+/**
+ * Short code as one continuous Epic-style group of tall digit boxes
+ * (no mid-code gap for 4-character pairing codes).
+ */
 @Composable
 private fun PairingCodeHighlight(
     code: String,
     modifier: Modifier = Modifier,
 ) {
-    val formatted = code.chunked(2).joinToString("  ")
+    val chars = code.uppercase().take(ShortCodeGenerator.LENGTH).padEnd(ShortCodeGenerator.LENGTH)
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -192,23 +198,30 @@ private fun PairingCodeHighlight(
             fontWeight = FontWeight.Medium,
             letterSpacing = 0.6.sp,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .clip(PairingFieldShape)
-                .border(width = 1.dp, color = FieldBorder, shape = PairingFieldShape)
-                .padding(horizontal = 24.dp, vertical = 14.dp),
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = formatted,
-                color = FieldText,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 4.sp,
-                textAlign = TextAlign.Center,
-            )
+            chars.forEach { ch ->
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .width(52.dp)
+                        .height(68.dp)
+                        .clip(CodeBoxShape)
+                        .border(width = 1.dp, color = FieldBorder, shape = CodeBoxShape),
+                ) {
+                    Text(
+                        text = if (ch.isWhitespace()) "" else ch.toString(),
+                        color = FieldText,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
         }
     }
 }

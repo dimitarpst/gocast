@@ -5,10 +5,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * Writable per-user dirs. Relative paths like `kcef-bundle` break for MSI installs
- * (cwd under Program Files, or a different cwd each launch).
- *
- * Everything lives under `%LOCALAPPDATA%\gocast` so uninstall can wipe one tree.
+ * Writable per-user dirs under `%LOCALAPPDATA%\gocast` so uninstall can wipe one tree.
  */
 object GocastDataDirs {
     fun root(): File {
@@ -23,10 +20,6 @@ object GocastDataDirs {
         }
         return base
     }
-
-    fun kcefBundle(): File = File(root(), "kcef-bundle").also { it.mkdirs() }
-
-    fun kcefCache(): File = File(root(), "kcef-cache").also { it.mkdirs() }
 
     /**
      * Older builds stored identity under `~/.gocast`. Copy into LocalAppData once

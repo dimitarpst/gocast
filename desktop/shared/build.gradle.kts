@@ -28,7 +28,7 @@ kotlin {
             implementation(libs.qrcodegen)
             implementation(libs.ktor.server.websockets)
             implementation(libs.kotlinx.serialization.json)
-            implementation(libs.compose.webview)
+            implementation(libs.compose.webview.native)
             implementation(libs.jmdns)
         }
     }

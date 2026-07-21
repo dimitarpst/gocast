@@ -21,6 +21,7 @@ import androidx.compose.ui.window.rememberWindowState
 import app.gocast.discovery.GocastAdvertiser
 import app.gocast.domain.JvmSessionFactory
 import app.gocast.platform.GocastShutdown
+import app.gocast.platform.WebView2Support
 import app.gocast.platform.WindowsLanAccess
 import app.gocast.server.KtorGocastServer
 import app.gocast.server.SessionGuard
@@ -36,6 +37,9 @@ private val DefaultWindowSize = DpSize(1280.dp, 800.dp)
 fun main() {
     // Packaged Windows: detect whether inbound LAN is open (no UAC yet).
     WindowsLanAccess.refreshStatus()
+
+    println("gocast: viewer backend = WebView2")
+    WebView2Support.prepareProcessEnvironment()
 
     val identityStore = DesktopIdentityStore()
     val server = KtorGocastServer(identityStore)
@@ -61,7 +65,6 @@ fun main() {
 
         Window(
             onCloseRequest = {
-                // Close immediately — KCEF dispose used to freeze the X for seconds.
                 GocastShutdown.beginBackground(advertiser, server)
                 exitApplication()
             },
