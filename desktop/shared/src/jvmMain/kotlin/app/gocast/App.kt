@@ -134,6 +134,7 @@ fun App(
                     session = session,
                     displayName = displayName,
                     onRename = onRename,
+                    canInstallUpdate = !phoneConnected && !castingActive,
                 )
                 if (phoneConnected && !castingActive) {
                     Text(

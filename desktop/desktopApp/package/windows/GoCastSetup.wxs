@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:bal="http://schemas.microsoft.com/wix/BalExtension"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <!-- Separate stable identity for the setup wrapper; the MSI keeps its existing UpgradeCode. -->
+  <Bundle Name="GoCast" Version="$(var.Version)" Manufacturer="GoCast"
+          UpgradeCode="79F09BD7-5C40-4C03-928F-29C239C710A2"
+          IconSourceFile="$(var.IconPath)" Compressed="yes" DisableModify="button"
+          Condition="VersionNT64 AND VersionNT &gt;= v10.0"
+          AboutUrl="https://github.com/dimitarpst/gocast">
+    <Log Prefix="GoCast-setup" />
+    <util:RegistrySearch Id="WebView2MachineSearch" Root="HKLM"
+        Key="SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+        Value="pv" Variable="WebView2MachineVersion" Result="value" Win64="no" />
+    <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.HyperlinkLicense">
+      <bal:WixStandardBootstrapperApplication LicenseUrl=""
+          LogoFile="$(var.LogoPath)" ThemeFile="$(var.ThemePath)"
+          SuppressOptionsUI="yes" SuppressDowngradeFailure="no"
+          SuppressRepair="no" ShowFilesInUse="yes" />
+    </BootstrapperApplicationRef>
+    <Chain>
+      <!-- Shared Microsoft prerequisite: install only if absent; never remove it with GoCast. -->
+      <ExePackage Id="WebView2Runtime" SourceFile="$(var.WebView2Path)"
+          DisplayName="Microsoft Edge WebView2 Runtime" InstallCommand="/silent /install"
+          DetectCondition="WebView2MachineVersion &gt; v0.0.0.0"
+          PerMachine="yes" Permanent="yes" Vital="yes" Cache="yes" />
+      <!-- Burn caches the payload and owns maintenance/rollback. Hide the child
+           MSI entry to avoid two competing Windows maintenance entries. -->
+      <MsiPackage Id="GoCastApplication" SourceFile="$(var.MsiPath)"
+                  DisplayName="GoCast" Visible="no" Vital="yes" DisplayInternalUI="no" />
+    </Chain>
+  </Bundle>
+</Wix>

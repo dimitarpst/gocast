@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Original GoCast theme using WixStdBA's documented control names. -->
+<Theme xmlns="http://wixtoolset.org/schemas/thmutil/2010">
+  <Window Width="580" Height="420" HexStyle="100a0000" FontId="0">GoCast setup</Window>
+  <Font Id="0" Height="-14" Weight="400" Foreground="E8ECF5" Background="12141A">Segoe UI</Font>
+  <Font Id="1" Height="-28" Weight="600" Foreground="E8ECF5" Background="12141A">Segoe UI</Font>
+  <Font Id="2" Height="-14" Weight="400" Foreground="AAB4C7" Background="12141A">Segoe UI</Font>
+  <Font Id="3" Height="-14" Weight="600" Foreground="6EA8FE" Background="12141A">Segoe UI</Font>
+  <Font Id="4" Height="-14" Weight="600" Foreground="12141A" Background="6EA8FE">Segoe UI</Font>
+  <Image X="32" Y="28" Width="184" Height="52" ImageFile="logo.png" Visible="yes" />
+  <Text X="32" Y="100" Width="510" Height="28" FontId="2" Visible="yes">The Go experience · {{VERSION}}</Text>
+  <Page Name="Loading">
+    <Text X="32" Y="160" Width="510" Height="50" FontId="1">Getting setup ready…</Text>
+  </Page>
+  <Page Name="Install">
+    <Text X="32" Y="158" Width="510" Height="48" FontId="1">Your phone. A bigger screen.</Text>
+    <Text X="32" Y="218" Width="510" Height="70" FontId="2">Install GoCast on this PC to receive your phone screen over Wi-Fi.</Text>
+    <Button Name="InstallButton" X="32" Y="-32" Width="180" Height="38" FontId="4" TabStop="yes">#(loc.InstallInstallButton)</Button>
+    <Button Name="WelcomeCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Close</Button>
+  </Page>
+  <Page Name="Modify">
+    <Text X="32" Y="158" Width="510" Height="48" FontId="1">Manage GoCast</Text>
+    <Text X="32" Y="218" Width="510" Height="70" FontId="2">Repair the app or remove it from this PC. Your personal settings are kept.</Text>
+    <Button Name="RepairButton" X="32" Y="-32" Width="144" Height="38" FontId="4" TabStop="yes" HideWhenDisabled="yes">Repair</Button>
+    <Button Name="UninstallButton" X="192" Y="-32" Width="144" Height="38" FontId="4" TabStop="yes">Uninstall</Button>
+    <Button Name="ModifyCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Close</Button>
+  </Page>
+  <Page Name="Progress">
+    <Text X="32" Y="158" Width="510" Height="48" FontId="1">#(loc.ProgressHeader)</Text>
+    <Text Name="OverallProgressPackageText" X="32" Y="224" Width="510" Height="28" FontId="2" />
+    <Progressbar Name="OverallCalculatedProgressbar" X="32" Y="274" Width="516" Height="14" />
+    <Button Name="ProgressCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Cancel</Button>
+  </Page>
+  <Page Name="FilesInUse">
+    <Text X="32" Y="146" Width="510" Height="40" FontId="1">Close the app to continue.</Text>
+    <Text Name="FilesInUseText" X="32" Y="192" Width="510" Height="52" FontId="2" HexStyle="0x0000C000" />
+    <Button Name="FilesInUseCloseRadioButton" X="32" Y="256" Width="510" Height="24" FontId="0" TabStop="yes" HideWhenDisabled="yes" HexStyle="0x000009">#(loc.FilesInUseCloseRadioButton)</Button>
+    <Button Name="FilesInUseDontCloseRadioButton" X="32" Y="286" Width="510" Height="24" FontId="0" TabStop="yes" HideWhenDisabled="yes" HexStyle="0x000009">#(loc.FilesInUseDontCloseRadioButton)</Button>
+    <Button Name="FilesInUseOkButton" X="32" Y="-32" Width="144" Height="38" FontId="4" TabStop="yes" HideWhenDisabled="yes">Continue</Button>
+    <Button Name="FilesInUseCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Cancel</Button>
+  </Page>
+  <Page Name="Success">
+    <Text Name="SuccessHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">#(loc.SuccessHeader)</Text>
+    <Text Name="SuccessInstallHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">GoCast is ready.</Text>
+    <Text Name="SuccessRepairHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">Repair complete.</Text>
+    <Text Name="SuccessUninstallHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">GoCast has been removed.</Text>
+    <Text Name="SuccessRestartText" X="32" Y="230" Width="510" Height="58" FontId="2" HideWhenDisabled="yes">#(loc.SuccessRestartText)</Text>
+    <Button Name="SuccessRestartButton" X="32" Y="-32" Width="144" Height="38" FontId="4" TabStop="yes" HideWhenDisabled="yes">Restart</Button>
+    <Button Name="SuccessCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Done</Button>
+  </Page>
+  <Page Name="Failure">
+    <Text Name="FailureHeader" X="32" Y="146" Width="510" Height="42" FontId="1" HideWhenDisabled="yes">#(loc.FailureHeader)</Text>
+    <Text Name="FailureInstallHeader" X="32" Y="146" Width="510" Height="42" FontId="1" HideWhenDisabled="yes">Installation didn't finish.</Text>
+    <Text Name="FailureRepairHeader" X="32" Y="146" Width="510" Height="42" FontId="1" HideWhenDisabled="yes">Repair didn't finish.</Text>
+    <Text Name="FailureUninstallHeader" X="32" Y="146" Width="510" Height="42" FontId="1" HideWhenDisabled="yes">Uninstall didn't finish.</Text>
+    <Hypertext Name="FailureLogFileLink" X="32" Y="204" Width="510" Height="32" FontId="3" TabStop="yes" HideWhenDisabled="yes">#(loc.FailureHyperlinkLogText)</Hypertext>
+    <Hypertext Name="FailureMessageText" X="32" Y="244" Width="510" Height="64" FontId="2" TabStop="yes" HideWhenDisabled="yes" />
+    <Text Name="FailureRestartText" X="32" Y="310" Width="340" Height="40" FontId="2" HideWhenDisabled="yes">#(loc.FailureRestartText)</Text>
+    <Button Name="FailureRestartButton" X="32" Y="-32" Width="144" Height="38" FontId="4" TabStop="yes" HideWhenDisabled="yes">Restart</Button>
+    <Button Name="FailureCloseButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Close</Button>
+  </Page>
+  <Page Name="Help">
+    <Text X="32" Y="150" Width="510" Height="42" FontId="1">GoCast setup</Text>
+    <Text X="32" Y="208" Width="510" Height="120" FontId="2">#(loc.HelpText)</Text>
+    <Button Name="HelpCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Close</Button>
+  </Page>
+</Theme>

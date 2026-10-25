@@ -19,10 +19,15 @@ Phone and PC need to be on the **same Wi‑Fi**. The desktop app accepts connect
 
 | Platform | File |
 |----------|------|
-| **Windows** | `.msi` installer |
+| **Windows** | GoCast setup `.exe` for new releases; existing releases use `.msi` |
 | **Android** | `.apk` |
 
 Get the latest builds from [Releases](https://github.com/dimitarpst/gocast/releases).
+
+The desktop **Updates** control checks GitHub for newer stable versions. The new
+setup/update flow is under development; existing published packages are unchanged.
+Work is tracked in [TASKS.md](TASKS.md). See [release packaging](docs/releases.md)
+for building and validating the new Windows setup.
 
 ## Why it exists
 
@@ -36,10 +41,31 @@ gocast does one job, cleanly.
 |------|------|
 | `android/` | Phone app |
 | `desktop/` | Windows app |
+| `protocol/` | Kotlin Multiplatform connection messages and pairing rules shared by both apps |
 | `cast-site/` | Join links for `cast.govrse.app` |
 | `branding/` | Logos and marks |
 
 ## Develop
+
+For Windows + USB-connected phone testing, double-click one of these files:
+
+- **Refresh Phone.cmd** — update and reopen the phone app.
+- **Refresh PC.cmd** — rebuild and reopen the PC app.
+- **Refresh Both.cmd** — refresh both apps.
+
+The command-line equivalent is:
+
+```powershell
+.\scripts\dev.ps1
+```
+
+This updates **gocast Dev** on the phone without uninstalling, restarts the desktop
+development window, and records the build label in the refresh output. See
+[local development testing](docs/development.md) for setup, logs and focused refreshes.
+
+Open `android/` or `desktop/` as before. Both builds include `protocol/` automatically;
+each uses its existing Kotlin version. Run `./gradlew :protocol:jvmTest` from either
+app directory to check handshake and join-link compatibility.
 
 **Desktop**
 

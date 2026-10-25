@@ -2,6 +2,8 @@
 
 Audited: 25 October 2026. Windows first. Status: local source and GitHub release metadata audited; published package internals and runtime behaviour are unverified.
 
+Implementation follow-up: versioned setup/update source is now written; see [the current release notes](../docs/releases.md). The findings table below records the pre-change audit. Runtime validation and legacy installer migration remain pending.
+
 ## Confirmed repository and releases
 
 GitHub access is now connected to the verified `dimitarpst` account. The repository is [dimitarpst/gocast](https://github.com/dimitarpst/gocast), with default branch `master`. Published releases [v1.0.0](https://github.com/dimitarpst/gocast/releases/tag/v1.0.0), [v1.0.1](https://github.com/dimitarpst/gocast/releases/tag/v1.0.1), and [v1.0.2](https://github.com/dimitarpst/gocast/releases/tag/v1.0.2) each contain matching APK and MSI assets. The latest listed release is v1.0.2, with `gocast-1.0.2.apk` and `gocast-1.0.2.msi`. Asset metadata includes SHA-256 digests; this alone does not establish the package publisher's signing identity.

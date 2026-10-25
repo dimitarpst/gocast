@@ -52,6 +52,9 @@ try {
   if (version !== expectedVersion || String(upgradeCode).toUpperCase() !== "{7E3A9C2B-5F14-4D8A-9B6E-1C0D4A8F2E75}") {
     throw new Error("Unexpected GoCast package identity/version");
   }
+  if (!tableHasRow("SELECT `Directory` FROM `Directory` WHERE `Directory`='INSTALLDIR'")) {
+    throw new Error("Missing expected GoCast installation directory");
+  }
   var removeFiles = Number(scalar("SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action`='RemoveFiles'"));
   var initialise = Number(scalar("SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action`='InstallInitialize'"));
   if (!removeFiles || !initialise || removeFiles <= initialise + 1) {
@@ -103,11 +106,11 @@ try {
   // Ensure CustomAction table exists (jpackage MSIs include it).
     if (!tableHasRow("SELECT `Action` FROM `CustomAction` WHERE `Action`='GocastCleanup'")) {
       // Type 34 (directory EXE) + Continue + deferred + no impersonate = 3170.
-      // Run via SystemFolder\cmd.exe so the .cmd under INSTALLDIR\resources works.
+      // Use the installed directory as the working directory and the protected system cmd.exe.
       execSql(
         "INSERT INTO `CustomAction` (`Action`,`Type`,`Source`,`Target`) " +
-          "VALUES ('GocastCleanup', 3170, 'SystemFolder', " +
-          "'cmd.exe /d /s /c \"\"[INSTALLDIR]resources\\gocast-cleanup.cmd\"\"')"
+          "VALUES ('GocastCleanup', 3170, 'INSTALLDIR', " +
+          "'\"[SystemFolder]cmd.exe\" /d /s /c \"\"[INSTALLDIR]resources\\gocast-cleanup.cmd\"\"')"
       );
     }
 

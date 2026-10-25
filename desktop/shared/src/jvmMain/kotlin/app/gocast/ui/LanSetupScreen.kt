@@ -1,6 +1,8 @@
 package app.gocast.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gocast.platform.WindowsLanAccess
+import app.gocast.server.SignalingHub
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,6 +54,8 @@ fun LanSetupScreen(
     onReady: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val phoneConnected by SignalingHub.phoneConnected.collectAsState()
+    val castingActive by SignalingHub.castingActive.collectAsState()
     val rulesAlreadyOk = remember {
         WindowsLanAccess.status() == WindowsLanAccess.Status.Allowed
     }
@@ -92,6 +98,7 @@ fun LanSetupScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .widthIn(max = 480.dp)
+                .verticalScroll(rememberScrollState())
                 .padding(32.dp),
         ) {
             BrandHeader(logoHeight = 44.dp)
@@ -216,6 +223,10 @@ fun LanSetupScreen(
                     }
                 }
             }
+            Spacer(Modifier.height(16.dp))
+            DesktopUpdateControl(
+                canInstall = !phoneConnected && !castingActive && phase != LanSetupPhase.Waiting,
+            )
         }
     }
 }

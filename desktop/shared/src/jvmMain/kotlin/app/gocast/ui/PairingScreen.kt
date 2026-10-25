@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,12 +49,12 @@ import app.gocast.domain.ShortCodeGenerator
 import app.gocast.domain.model.JoinSession
 import app.gocast.qr.QrCodeEncoder
 
-private val PairingFieldShape = RoundedCornerShape(8.dp)
+private val PairingFieldShape = RoundedCornerShape(24.dp)
 private val FieldBorder = Color(0xFF2A3142)
 private val FieldText = Color(0xFFE8ECF5)
 private val FieldMuted = Color(0xFF7E8798)
 private val BrandBlue = Color(0xFF6EA8FE)
-private val CodeBoxShape = RoundedCornerShape(8.dp)
+private val CodeBoxShape = RoundedCornerShape(16.dp)
 
 @Composable
 fun PairingScreen(
@@ -61,6 +62,7 @@ fun PairingScreen(
     displayName: String,
     onRename: (String) -> Unit,
     modifier: Modifier = Modifier,
+    canInstallUpdate: Boolean = true,
 ) {
     val qrBitmap = remember(session.joinUrl) {
         QrCodeEncoder.encode(session.joinUrl)
@@ -90,8 +92,9 @@ fun PairingScreen(
                     value = draftName,
                     onValueChange = { draftName = it.take(48) },
                     singleLine = true,
+                    textStyle = MaterialTheme.typography.titleMedium,
                     shape = PairingFieldShape,
-                    label = { Text("This PC") },
+                    label = { Text("This PC", style = MaterialTheme.typography.labelLarge) },
                     trailingIcon = {
                         EditGlyph(
                             tint = Color(0xFF9AA3B5),
@@ -173,6 +176,9 @@ fun PairingScreen(
                     textAlign = TextAlign.Center,
                 )
             }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            DesktopUpdateControl(canInstall = canInstallUpdate)
         }
     }
 }

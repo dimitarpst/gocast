@@ -39,9 +39,11 @@ Then:
 
 Output (typical):
 
-`desktopApp/build/compose/binaries/main/msi/gocast-1.0.2.msi`
+`desktopApp/build/compose/binaries/main/msi/gocast-<version>.msi`
 
-The MSI is branded as **gocast** (publisher, Start Menu group, shortcut, description). Packaging also injects an uninstall custom action that runs `gocast-cleanup.cmd`.
+The version comes from the root `release.properties`. Packaging configures upgrade/downgrade handling and explicit-uninstall network cleanup. Required authoring failures stop the package task.
+
+For the branded setup wrapper, double-click **Build Windows Setup.cmd** at the repository root. This produces the normal setup EXE plus the underlying MSI and hashes; it never installs them. See [release packaging](../docs/releases.md) for prerequisites, optional signing, and pending validation.
 
 ### First-run LAN setup (port 8765)
 
@@ -49,10 +51,8 @@ After a fresh install, the app always shows the network permission screen once b
 
 No PowerShell for end users. Gradle/Java runs do not set these rules.
 
-### Uninstall wipe
+### Uninstall and repair
 
-Uninstalling the MSI runs `resources\gocast-cleanup.cmd`, which removes:
+New packages run `resources\gocast-cleanup.cmd` before its payload is removed, only during explicit uninstall. It removes the firewall rules named `gocast` and `gocast TCP 8765`.
 
-- Firewall rules named `gocast` and `gocast TCP 8765`
-- `%LOCALAPPDATA%\gocast` (identity, prefs, WebView2 user data) for each Windows user profile
-- Legacy `%USERPROFILE%\.gocast` if present
+Personal data under `%LOCALAPPDATA%\gocast` and legacy `%USERPROFILE%\.gocast` is preserved. Repair restores installed components. The new setup wrapper owns maintenance for wrapper installations. Old published installers have different cleanup behaviour and require migration testing; this code does not rewrite their cached installers.
