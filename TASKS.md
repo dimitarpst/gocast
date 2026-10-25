@@ -30,6 +30,7 @@ This is the persistent working list. Update it when work starts, scope changes, 
 - [ ] **DEL-06 — Download and setup handoff.** Progress/cancel, bounded HTTPS redirects, size/SHA-256 verification, cached completed downloads across restarts, recheck before opening, and active-connection/cast guard implemented. Tests added for version/asset/redirect boundaries and changed downloads, but not run. SHA-256/TLS verifies delivery from the repository; independent publisher-signature validation is not implemented or claimed. Production signing belongs to DEL-08.
 - [ ] **DEV-01 — Refresh Phone / PC / Both launchers.** Update installed development apps without repetitive uninstalling; save session logs. Some earlier runs were checked, but this does not validate Windows installer maintenance.
 - [ ] **UI-02 — Reuse the approved QR symbol inside the scanner.** One vector resource shared with the action button; no build/device check performed for this change.
+- [ ] **UI-03 — Desktop edit icon.** Replaced the fragmented filled pencil beside This PC with one clean rounded outline. Refresh/review is user-operated; no build or app launch performed for this change.
 
 ## Completed research / recorded requirements
 

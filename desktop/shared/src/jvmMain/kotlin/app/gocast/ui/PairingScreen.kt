@@ -37,6 +37,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
@@ -232,45 +235,31 @@ private fun PairingCodeHighlight(
     }
 }
 
-/** Classic pencil/edit mark — filled body + tip, readable at 18dp. */
+/** A single outlined pencil, matching the rounded strokes of the connection icons. */
 @Composable
 private fun EditGlyph(
     tint: Color,
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier) {
-        val w = size.minDimension
-        val shaft = Path().apply {
-            moveTo(w * 0.28f, w * 0.72f)
-            lineTo(w * 0.68f, w * 0.32f)
-            lineTo(w * 0.78f, w * 0.42f)
-            lineTo(w * 0.38f, w * 0.82f)
-            close()
+        scale(size.minDimension / 24f, pivot = Offset.Zero) {
+            val pencil = Path().apply {
+                moveTo(3.5f, 16.5f)
+                lineTo(16.5f, 3.5f)
+                cubicTo(17.3f, 2.7f, 18.7f, 2.7f, 19.5f, 3.5f)
+                lineTo(20.5f, 4.5f)
+                cubicTo(21.3f, 5.3f, 21.3f, 6.7f, 20.5f, 7.5f)
+                lineTo(7.5f, 20.5f)
+                lineTo(2.5f, 21.5f)
+                close()
+                moveTo(14.5f, 5.5f)
+                lineTo(18.5f, 9.5f)
+            }
+            drawPath(
+                pencil,
+                color = tint,
+                style = Stroke(width = 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+            )
         }
-        drawPath(shaft, color = tint)
-
-        val tip = Path().apply {
-            moveTo(w * 0.28f, w * 0.72f)
-            lineTo(w * 0.14f, w * 0.86f)
-            lineTo(w * 0.38f, w * 0.82f)
-            close()
-        }
-        drawPath(tip, color = tint)
-
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.62f, w * 0.26f),
-            end = Offset(w * 0.74f, w * 0.38f),
-            strokeWidth = w * 0.10f,
-            cap = StrokeCap.Round,
-        )
-
-        drawLine(
-            color = Color(0xFF12141A),
-            start = Offset(w * 0.22f, w * 0.78f),
-            end = Offset(w * 0.18f, w * 0.82f),
-            strokeWidth = w * 0.06f,
-            cap = StrokeCap.Round,
-        )
     }
 }
