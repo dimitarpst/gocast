@@ -67,8 +67,7 @@ fun PairingScreen(
                 PcNameHeader(
                     displayName = displayName,
                     onRenameClick = { showRenameDialog = true },
-                    modifier = if (narrow) Modifier.fillMaxWidth()
-                    else Modifier.widthIn(min = 240.dp, max = 360.dp),
+                    modifier = Modifier.widthIn(max = 320.dp),
                 )
             }
 

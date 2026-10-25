@@ -2,10 +2,12 @@ package app.gocast.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +61,9 @@ fun GocastTheme(content: @Composable () -> Unit) {
         colorScheme = GocastColors,
         typography = GocastTypography,
         shapes = GocastShapes,
-        content = content,
-    )
+    ) {
+        // A background Box does not establish a Material content colour. Keep
+        // unwrapped text readable as well as text inside Surfaces and dialogs.
+        CompositionLocalProvider(LocalContentColor provides GocastColors.onBackground, content = content)
+    }
 }
