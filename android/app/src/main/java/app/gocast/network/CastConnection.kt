@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import app.gocast.capture.CaptureService
 import app.gocast.domain.ConnectionState
-import app.gocast.domain.JoinParams
+import app.gocast.protocol.JoinParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

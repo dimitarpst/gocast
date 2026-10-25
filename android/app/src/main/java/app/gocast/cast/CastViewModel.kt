@@ -11,7 +11,7 @@ import app.gocast.capture.CaptureService
 import app.gocast.data.TrustedPcStore
 import app.gocast.domain.ConnectionState
 import app.gocast.domain.DiscoveredHost
-import app.gocast.domain.JoinParams
+import app.gocast.protocol.JoinParams
 import app.gocast.domain.JoinUrlParser
 import app.gocast.domain.TrustedPc
 import app.gocast.network.CastConnection

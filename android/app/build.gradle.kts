@@ -7,16 +7,30 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val devBuildLabel = providers.gradleProperty("gocastDevBuild").getOrElse("Android Studio")
+val releaseInfo = Properties().apply {
+    rootProject.file("../release.properties").reader().use { load(it) }
+}
+val releaseVersion = requireNotNull(releaseInfo.getProperty("version")).also {
+    require(it.matches(Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"))) {
+        "release.properties must contain a three-part version"
+    }
+}
+val releaseVersionCode = releaseInfo.getProperty("androidVersionCode").toInt().also {
+    require(it > 0) { "androidVersionCode must be positive" }
+}
+
 android {
     namespace = "app.gocast"
     compileSdk = 36
+    sourceSets.getByName("main").res.srcDir("../../branding/fonts/res")
 
     defaultConfig {
         applicationId = "app.gocast"
         minSdk = 29
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.0.2"
+        versionCode = releaseVersionCode
+        versionName = releaseVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,7 +51,20 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep a stable development install beside the signed release. Updating
+            // this package preserves its pairing, settings and onboarding state.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-dev"
+            resValue("string", "app_name", "gocast Dev")
+            buildConfigField(
+                "String",
+                "DEV_BUILD_LABEL",
+                "\"${devBuildLabel.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+            )
+        }
         release {
+            buildConfigField("String", "DEV_BUILD_LABEL", "\"\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -58,10 +85,12 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
+    implementation(project(":protocol"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

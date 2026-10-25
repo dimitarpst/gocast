@@ -1,34 +1,33 @@
 package app.gocast.ui.theme
 
-import androidx.compose.material3.Typography
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.material3.Typography as MaterialTypography
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
+import app.gocast.R
 
-// Set of Material typography styles to start with
-val Typography = Typography(
-    bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
-    )
-    /* Other default text styles to override
-    titleLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        letterSpacing = 0.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
-    )
-    */
+// These exact font files are also packaged by the desktop app.
+private val GocastFont = FontFamily(
+    Font(R.font.gocast_regular, FontWeight.Normal),
+    Font(R.font.gocast_medium, FontWeight.Medium),
+    Font(R.font.gocast_medium, FontWeight.SemiBold),
+    Font(R.font.gocast_bold, FontWeight.Bold),
 )
+
+val Typography = MaterialTypography().run { copy(
+    displayLarge = displayLarge.copy(fontFamily = GocastFont),
+    displayMedium = displayMedium.copy(fontFamily = GocastFont),
+    displaySmall = displaySmall.copy(fontFamily = GocastFont),
+    headlineLarge = headlineLarge.copy(fontFamily = GocastFont),
+    headlineMedium = headlineMedium.copy(fontFamily = GocastFont),
+    headlineSmall = headlineSmall.copy(fontFamily = GocastFont),
+    titleLarge = titleLarge.copy(fontFamily = GocastFont),
+    titleMedium = titleMedium.copy(fontFamily = GocastFont),
+    titleSmall = titleSmall.copy(fontFamily = GocastFont),
+    bodyLarge = bodyLarge.copy(fontFamily = GocastFont),
+    bodyMedium = bodyMedium.copy(fontFamily = GocastFont),
+    bodySmall = bodySmall.copy(fontFamily = GocastFont),
+    labelLarge = labelLarge.copy(fontFamily = GocastFont),
+    labelMedium = labelMedium.copy(fontFamily = GocastFont),
+    labelSmall = labelSmall.copy(fontFamily = GocastFont),
+) }

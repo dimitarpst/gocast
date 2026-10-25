@@ -5,11 +5,20 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
 }
 
+val generateReleaseMetadata = tasks.register<Copy>("generateReleaseMetadata") {
+    from(rootProject.file("../release.properties"))
+    into(layout.buildDirectory.dir("generated/releaseResources"))
+    rename { "gocast-release.properties" }
+}
+
 kotlin {
     jvm()
 
     sourceSets {
+        getByName("jvmMain").resources.srcDir("../../branding/fonts/res/font")
+        getByName("jvmMain").resources.srcDir(generateReleaseMetadata)
         commonMain.dependencies {
+            implementation(project(":protocol"))
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)

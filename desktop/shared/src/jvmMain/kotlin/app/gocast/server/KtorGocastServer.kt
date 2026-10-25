@@ -1,7 +1,7 @@
 package app.gocast.server
 
-import app.gocast.domain.model.HelloMessage
-import app.gocast.domain.model.HelloOkMessage
+import app.gocast.protocol.HelloMessage
+import app.gocast.protocol.HelloOkMessage
 import app.gocast.trust.DesktopIdentityStore
 import io.ktor.http.ContentType
 import io.ktor.server.application.Application

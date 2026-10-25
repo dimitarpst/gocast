@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,10 +60,12 @@ import app.gocast.cast.CastEvent
 import app.gocast.cast.CastViewModel
 import app.gocast.domain.ConnectionState
 import app.gocast.domain.DiscoveredHost
-import app.gocast.domain.JoinParams
+import app.gocast.protocol.JoinParams
 import app.gocast.domain.JoinUrlParser
 import app.gocast.domain.TrustedPc
 import app.gocast.ui.components.DiscoveredHostCard
+import app.gocast.ui.components.ConnectionActionCard
+import app.gocast.ui.components.ConnectionActionSymbol
 import app.gocast.ui.components.LastConnectedCard
 import app.gocast.ui.components.PAIRING_CODE_LENGTH
 import app.gocast.ui.components.PairingCodeInput
@@ -81,6 +86,8 @@ private enum class ConnectMode {
 fun ConnectScreen(
     deepLinkUri: Uri?,
     resumeCastRequestId: Int = 0,
+    startWithQualitySettings: Boolean = false,
+    onShowWalkthrough: () -> Unit = {},
     viewModel: CastViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -89,7 +96,9 @@ fun ConnectScreen(
     val discoveredHosts by viewModel.discoveredHosts.collectAsStateWithLifecycle()
     val joinBusy by viewModel.joinBusy.collectAsStateWithLifecycle()
     val castUiState by CaptureService.castUiState.collectAsStateWithLifecycle()
-    var mode by remember { mutableStateOf(ConnectMode.Home) }
+    var mode by remember {
+        mutableStateOf(if (startWithQualitySettings) ConnectMode.Quality else ConnectMode.Home)
+    }
     var selectedHost by remember { mutableStateOf<DiscoveredHost?>(null) }
     var codeInput by remember { mutableStateOf("") }
 
@@ -133,6 +142,7 @@ fun ConnectScreen(
     val scannerConfig = remember {
         ScannerConfig.build {
             setBarcodeFormats(listOf(BarcodeFormat.FORMAT_QR_CODE))
+            setOverlayDrawableRes(R.drawable.ic_qr_code)
             setOverlayStringRes(R.string.scan_qr_hint)
             setHapticSuccessFeedback(true)
             setShowTorchToggle(true)
@@ -283,6 +293,7 @@ fun ConnectScreen(
                     onResume = { viewModel.onResumeCastRequested() },
                     onStop = { viewModel.stopCast() },
                     onQuality = { mode = ConnectMode.Quality },
+                    onShowWalkthrough = onShowWalkthrough,
                 )
             }
 
@@ -354,9 +365,15 @@ private fun HomeContent(
     onResume: () -> Unit,
     onStop: () -> Unit,
     onQuality: () -> Unit,
+    onShowWalkthrough: () -> Unit,
 ) {
+    val scrollState = rememberScrollState()
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = if (isActiveCast) {
+            Modifier.fillMaxSize()
+        } else {
+            Modifier.fillMaxSize().verticalScroll(scrollState)
+        },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Image(
@@ -393,23 +410,23 @@ private fun HomeContent(
             Spacer(Modifier.height(20.dp))
             Text(
                 text = label,
-                style = if (connectionState is ConnectionState.Idle) {
-                    MaterialTheme.typography.titleMedium
-                } else {
-                    MaterialTheme.typography.headlineSmall
-                },
-                fontWeight = if (connectionState is ConnectionState.Idle) {
-                    FontWeight.Medium
-                } else {
-                    FontWeight.SemiBold
-                },
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
                 color = when (connectionState) {
                     is ConnectionState.Failed -> MaterialTheme.colorScheme.error
-                    is ConnectionState.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> MaterialTheme.colorScheme.onSurface
                 },
                 textAlign = TextAlign.Center,
             )
+            if (connectionState is ConnectionState.Idle) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.connect_choose_method),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
             Spacer(Modifier.height(28.dp))
         }
 
@@ -432,24 +449,31 @@ private fun HomeContent(
                         .padding(bottom = 8.dp),
                 )
             }
-            Button(
+            ConnectionActionCard(
+                title = stringResource(R.string.scan_qr),
+                subtitle = stringResource(R.string.scan_qr_description),
+                symbol = ConnectionActionSymbol.Qr,
+                prominent = true,
                 onClick = onScanQr,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.scan_qr))
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
+            )
+            Spacer(Modifier.height(12.dp))
+            ConnectionActionCard(
+                title = stringResource(R.string.find_on_wifi),
+                subtitle = stringResource(R.string.find_wifi_description),
+                symbol = ConnectionActionSymbol.Wifi,
+                prominent = false,
                 onClick = onFindWifi,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.find_on_wifi))
-            }
-            Spacer(Modifier.weight(1f))
+            )
+            Spacer(Modifier.height(20.dp))
         }
 
-        TextButton(onClick = onQuality) {
-            Text(stringResource(R.string.quality_settings))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onQuality) {
+                Text(stringResource(R.string.quality_settings))
+            }
+            TextButton(onClick = onShowWalkthrough) {
+                Text(stringResource(R.string.walkthrough_reopen))
+            }
         }
     }
 }

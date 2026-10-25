@@ -1,7 +1,7 @@
 package app.gocast.network
 
 import app.gocast.domain.ConnectionState
-import app.gocast.domain.JoinParams
+import app.gocast.protocol.JoinParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

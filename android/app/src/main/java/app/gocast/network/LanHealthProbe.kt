@@ -1,5 +1,6 @@
 package app.gocast.network
 
+import app.gocast.protocol.HostEndpoint
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit

@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.sp
 /** Unambiguous pairing codes are 4 characters (see desktop ShortCodeGenerator). */
 const val PAIRING_CODE_LENGTH = 4
 
-private val CodeBoxShape = RoundedCornerShape(8.dp)
+private val CodeBoxShape = RoundedCornerShape(16.dp)
 
 /**
  * Epic-style contiguous OTP boxes: tall rounded cells in one tight row.

@@ -129,7 +129,7 @@ fun LanSetupScreen(
                     Spacer(Modifier.height(28.dp))
                     Button(
                         onClick = { startAllow() },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BrandBlue,
                             contentColor = Color(0xFF0E1016),
@@ -176,7 +176,7 @@ fun LanSetupScreen(
                     Spacer(Modifier.height(28.dp))
                     Button(
                         onClick = { finish() },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BrandBlue,
                             contentColor = Color(0xFF0E1016),
@@ -206,7 +206,7 @@ fun LanSetupScreen(
                     Spacer(Modifier.height(28.dp))
                     Button(
                         onClick = { startAllow() },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BrandBlue,
                             contentColor = Color(0xFF0E1016),

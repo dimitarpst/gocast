@@ -1,5 +1,8 @@
 package app.gocast.network
 
+import app.gocast.protocol.HelloMessage
+import app.gocast.protocol.HelloOkMessage
+import app.gocast.protocol.HostEndpoint
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.websocket.Frame

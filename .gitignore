@@ -22,3 +22,6 @@
 
 # Local cast debug captures
 .cast-freeze-logcat*.txt
+
+# Repeatable local phone/desktop development sessions (logs and PID state)
+/.local-run/

@@ -1,4 +1,4 @@
-package app.gocast.network
+package app.gocast.protocol
 
 import kotlinx.serialization.Serializable
 
@@ -9,6 +9,8 @@ data class HelloMessage(
     val role: String = "phone",
 )
 
+// Older desktops may omit trust details; keep the phone's existing optional fields.
+// The desktop still supplies all three fields when sending a successful handshake.
 @Serializable
 data class HelloOkMessage(
     val type: String = "ok",

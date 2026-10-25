@@ -34,3 +34,5 @@ plugins {
 
 include(":desktopApp")
 include(":shared")
+include(":protocol")
+project(":protocol").projectDir = file("../protocol")

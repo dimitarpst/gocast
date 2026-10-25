@@ -1,6 +1,6 @@
 package app.gocast
 
-import androidx.compose.material3.MaterialTheme
+import app.gocast.ui.theme.GocastTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,7 +52,7 @@ fun GocastRoot(
         }
     }
 
-    MaterialTheme {
+    GocastTheme {
         if (!lanReady) {
             LanSetupScreen(onReady = { lanReady = true })
         } else {

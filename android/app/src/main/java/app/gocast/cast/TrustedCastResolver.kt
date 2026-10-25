@@ -2,7 +2,7 @@ package app.gocast.cast
 
 import android.content.Context
 import app.gocast.data.TrustedPcStore
-import app.gocast.domain.JoinParams
+import app.gocast.protocol.JoinParams
 import app.gocast.domain.TrustedPc
 import app.gocast.network.GocastDiscovery
 import kotlinx.coroutines.flow.first

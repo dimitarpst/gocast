@@ -53,6 +53,7 @@ fun GocastTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = GocastShapes,
         content = content
     )
 }

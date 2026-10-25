@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -34,8 +35,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.gocast.R
 import app.gocast.capture.CaptureService
 import app.gocast.settings.CastQualityProfile
 import app.gocast.settings.CastQualitySettings
@@ -146,6 +149,7 @@ fun QualitySettingsScreen(
         onInfo = { helpTarget = it },
         onCostTap = { weightPopup = it },
     )
+    val isCustomSettings = profiles.none { it.settings == settings }
 
     Column(
         Modifier
@@ -259,21 +263,42 @@ fun QualitySettingsScreen(
             )
         }
 
-        if (activeProfileId == null) {
-            Text(
-                "Unsaved custom mix — save it as a profile to reuse later.",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 4.dp),
-            )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = {
-                saveName = ""
-                showSaveDialog = true
-            }) {
-                Text("Save as profile")
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(
+                        if (isCustomSettings) R.string.quality_custom_title
+                        else R.string.quality_save_title,
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(
+                        if (isCustomSettings) R.string.quality_custom_description
+                        else R.string.quality_save_description,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = {
+                        saveName = ""
+                        showSaveDialog = true
+                    },
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(stringResource(R.string.quality_save_profile))
+                }
             }
         }
 

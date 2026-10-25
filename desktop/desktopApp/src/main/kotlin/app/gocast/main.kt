@@ -33,6 +33,7 @@ import javax.imageio.ImageIO
 
 private val MinWindowSize = DpSize(640.dp, 400.dp)
 private val DefaultWindowSize = DpSize(1280.dp, 800.dp)
+private val DevBuildLabel = System.getProperty("gocast.devBuild")?.takeIf { it.isNotBlank() }
 
 fun main() {
     // Packaged Windows: detect whether inbound LAN is open (no UAC yet).
@@ -67,7 +68,7 @@ fun main() {
                 GocastShutdown.beginBackground(advertiser, server)
                 exitApplication()
             },
-            title = "gocast",
+            title = DevBuildLabel?.let { "gocast Dev · $it" } ?: "gocast",
             icon = appIcon,
             state = windowState,
             onPreviewKeyEvent = { event ->

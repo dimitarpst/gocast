@@ -1,5 +1,7 @@
 package app.gocast.domain.model
 
+import app.gocast.protocol.JoinLink
+
 data class JoinSession(
     val host: String,
     val port: Int,
@@ -9,9 +11,6 @@ data class JoinSession(
     val displayName: String,
 ) {
     val joinUrl: String
-        get() {
-            val authority = if (host.contains(':')) "[$host]:$port" else "$host:$port"
-            // Prefer shortCode over the UUID token so the QR stays low-version (large dots).
-            return "https://cast.govrse.app/join?a=$authority&t=$shortCode"
-        }
+        // Prefer shortCode over the UUID token so the QR stays low-version (large dots).
+        get() = JoinLink.create(host, port, shortCode)
 }

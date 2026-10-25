@@ -1,0 +1,10 @@
+<resources>
+    <string name="connect_choose_method">Choose how to connect to your PC.</string>
+    <string name="scan_qr_description">Scan the code on your PC</string>
+    <string name="find_wifi_description">Choose a PC on your network</string>
+    <string name="quality_custom_title">Custom settings</string>
+    <string name="quality_custom_description">Your changes are saved automatically. Name this setup to reuse it as a profile.</string>
+    <string name="quality_save_title">Keep this setup</string>
+    <string name="quality_save_description">Save a named copy of these settings to use again later.</string>
+    <string name="quality_save_profile">Save as profile</string>
+</resources>

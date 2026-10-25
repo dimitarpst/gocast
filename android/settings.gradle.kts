@@ -21,4 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "android"
 include(":app")
- 
+include(":protocol")
+project(":protocol").projectDir = file("../protocol")

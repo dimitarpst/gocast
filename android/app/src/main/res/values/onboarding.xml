@@ -1,0 +1,21 @@
+<resources>
+    <string name="walkthrough_connect_title">Your phone.\nA bigger screen.</string>
+    <string name="walkthrough_connect_body">Open gocast on your PC and join the same Wi-Fi. Scan its QR with your phone, or choose Find on Wi-Fi and enter the pairing code.</string>
+    <string name="walkthrough_share_title">Share on your terms.</string>
+    <string name="walkthrough_share_body">Android asks before sharing starts. Stop from the app, its notification, or your PC. If sharing pauses, tap Resume.</string>
+    <string name="walkthrough_quality_title">Find your balance.</string>
+    <string name="walkthrough_quality_body">Choose Smooth, Balanced or Sharp in Quality settings. Fine-tune resolution, frame rate and bitrate, then save your own profiles. Changes save automatically.</string>
+    <string name="walkthrough_skip">Skip</string>
+    <string name="walkthrough_next">Next</string>
+    <string name="walkthrough_progress">Step %1$d of %2$d</string>
+    <string name="walkthrough_casting">Casting</string>
+    <string name="walkthrough_stopped">Stopped</string>
+    <string name="walkthrough_controls_hint">Try stopping this preview. It does not start or stop a real cast.</string>
+    <string name="walkthrough_try_again">Try again</string>
+    <string name="walkthrough_quality_hint">Try a preset here. This preview leaves your saved quality settings unchanged.</string>
+    <string name="walkthrough_preset_summary">%1$d fps · %2$d Mbps</string>
+    <string name="walkthrough_reopen">How it works</string>
+    <string name="intro_get_started">Get started</string>
+    <string name="intro_footer">No account. No cables.</string>
+    <string name="intro_illustration_description">A phone screen mirrored on a desktop monitor</string>
+</resources>

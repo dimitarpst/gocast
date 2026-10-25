@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -27,6 +29,19 @@ class MainActivity : ComponentActivity() {
 
     private var deepLinkUri by mutableStateOf<Uri?>(null)
     private var resumeCastRequestId by mutableStateOf(0)
+    private var debugScreenRequest by mutableStateOf<String?>(null)
+    private var debugRequestVersion by mutableStateOf(0)
+
+    private fun readDebugLaunchIntent(intent: Intent?) {
+        if (!BuildConfig.DEBUG || intent == null) return
+        val screen = if (intent.getBooleanExtra("gocast.showOnboarding", false)) {
+            "intro"
+        } else {
+            intent.getStringExtra("gocast.devScreen")?.takeIf { it == "home" || it == "quality" }
+        } ?: return
+        debugScreenRequest = screen
+        debugRequestVersion++
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,6 +50,7 @@ class MainActivity : ComponentActivity() {
         if (intent?.action == ACTION_RESUME_CAST) {
             resumeCastRequestId++
         }
+        readDebugLaunchIntent(intent)
         setContent {
             GocastTheme {
                 Surface(
@@ -45,10 +61,19 @@ class MainActivity : ComponentActivity() {
                     // Deep links / resume skip the walkthrough so join still works first launch.
                     var showOnboarding by remember {
                         mutableStateOf(
-                            deepLinkUri == null &&
-                                resumeCastRequestId == 0 &&
-                                !OnboardingStore.isDone(context),
+                            if (BuildConfig.DEBUG && debugScreenRequest != null) {
+                                debugScreenRequest == "intro"
+                            } else {
+                                deepLinkUri == null &&
+                                    resumeCastRequestId == 0 &&
+                                    !OnboardingStore.isDone(context)
+                            },
                         )
+                    }
+                    LaunchedEffect(debugRequestVersion) {
+                        if (BuildConfig.DEBUG && debugRequestVersion > 0) {
+                            showOnboarding = debugScreenRequest == "intro"
+                        }
                     }
                     if (showOnboarding) {
                         OnboardingScreen(
@@ -58,10 +83,15 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     } else {
-                        ConnectScreen(
-                            deepLinkUri = deepLinkUri,
-                            resumeCastRequestId = resumeCastRequestId,
-                        )
+                        key(debugRequestVersion) {
+                            ConnectScreen(
+                                deepLinkUri = deepLinkUri,
+                                resumeCastRequestId = resumeCastRequestId,
+                                startWithQualitySettings = BuildConfig.DEBUG &&
+                                    debugScreenRequest == "quality",
+                                onShowWalkthrough = { showOnboarding = true },
+                            )
+                        }
                     }
                 }
             }
@@ -75,5 +105,6 @@ class MainActivity : ComponentActivity() {
         if (intent.action == ACTION_RESUME_CAST) {
             resumeCastRequestId++
         }
+        readDebugLaunchIntent(intent)
     }
 }
