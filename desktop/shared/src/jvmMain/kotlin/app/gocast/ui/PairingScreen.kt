@@ -1,6 +1,5 @@
 package app.gocast.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,11 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,19 +26,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,11 +37,9 @@ import app.gocast.domain.ShortCodeGenerator
 import app.gocast.domain.model.JoinSession
 import app.gocast.qr.QrCodeEncoder
 
-private val PairingFieldShape = RoundedCornerShape(24.dp)
 private val FieldBorder = Color(0xFF2A3142)
 private val FieldText = Color(0xFFE8ECF5)
 private val FieldMuted = Color(0xFF7E8798)
-private val BrandBlue = Color(0xFF6EA8FE)
 private val CodeBoxShape = RoundedCornerShape(16.dp)
 
 @Composable
@@ -70,17 +53,7 @@ fun PairingScreen(
     val qrBitmap = remember(session.joinUrl) {
         QrCodeEncoder.encode(session.joinUrl)
     }
-    var draftName by remember(displayName) { mutableStateOf(displayName) }
-    val focusManager = LocalFocusManager.current
-
-    fun commitName() {
-        val next = draftName.trim()
-        if (next.isNotEmpty() && next != displayName) {
-            onRename(next)
-        } else {
-            draftName = displayName
-        }
-    }
+    var showRenameDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -90,48 +63,12 @@ fun PairingScreen(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val narrow = maxWidth < 720.dp
-            val nameField = @Composable {
-                OutlinedTextField(
-                    value = draftName,
-                    onValueChange = { draftName = it.take(48) },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.titleMedium,
-                    shape = PairingFieldShape,
-                    label = { Text("This PC", style = MaterialTheme.typography.labelLarge) },
-                    trailingIcon = {
-                        EditGlyph(
-                            tint = Color(0xFF9AA3B5),
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            commitName()
-                            focusManager.clearFocus()
-                        },
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = FieldText,
-                        unfocusedTextColor = FieldText,
-                        cursorColor = BrandBlue,
-                        focusedBorderColor = BrandBlue,
-                        unfocusedBorderColor = FieldBorder,
-                        focusedLabelColor = Color(0xFF9AA3B5),
-                        unfocusedLabelColor = FieldMuted,
-                        focusedTrailingIconColor = Color(0xFF9AA3B5),
-                        unfocusedTrailingIconColor = FieldMuted,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                    ),
-                    modifier = Modifier
-                        .then(
-                            if (narrow) Modifier.fillMaxWidth()
-                            else Modifier.widthIn(min = 200.dp, max = 280.dp),
-                        )
-                        .onFocusChanged { state ->
-                            if (!state.isFocused) commitName()
-                        },
+            val nameHeader = @Composable {
+                PcNameHeader(
+                    displayName = displayName,
+                    onRenameClick = { showRenameDialog = true },
+                    modifier = if (narrow) Modifier.fillMaxWidth()
+                    else Modifier.widthIn(min = 240.dp, max = 360.dp),
                 )
             }
 
@@ -141,7 +78,7 @@ fun PairingScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     BrandHeader(logoHeight = 36.dp)
-                    nameField()
+                    nameHeader()
                 }
             } else {
                 Row(
@@ -150,7 +87,7 @@ fun PairingScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     BrandHeader(logoHeight = 36.dp)
-                    nameField()
+                    nameHeader()
                 }
             }
         }
@@ -183,6 +120,14 @@ fun PairingScreen(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             DesktopUpdateControl(canInstall = canInstallUpdate)
         }
+    }
+    // Keep dialog state outside the responsive header branches when resizing.
+    if (showRenameDialog) {
+        RenamePcDialog(
+            currentName = displayName,
+            onSave = onRename,
+            onDismiss = { showRenameDialog = false },
+        )
     }
 }
 
@@ -231,35 +176,6 @@ private fun PairingCodeHighlight(
                     )
                 }
             }
-        }
-    }
-}
-
-/** A single outlined pencil, matching the rounded strokes of the connection icons. */
-@Composable
-private fun EditGlyph(
-    tint: Color,
-    modifier: Modifier = Modifier,
-) {
-    Canvas(modifier = modifier) {
-        scale(size.minDimension / 24f, pivot = Offset.Zero) {
-            val pencil = Path().apply {
-                moveTo(3.5f, 16.5f)
-                lineTo(16.5f, 3.5f)
-                cubicTo(17.3f, 2.7f, 18.7f, 2.7f, 19.5f, 3.5f)
-                lineTo(20.5f, 4.5f)
-                cubicTo(21.3f, 5.3f, 21.3f, 6.7f, 20.5f, 7.5f)
-                lineTo(7.5f, 20.5f)
-                lineTo(2.5f, 21.5f)
-                close()
-                moveTo(14.5f, 5.5f)
-                lineTo(18.5f, 9.5f)
-            }
-            drawPath(
-                pencil,
-                color = tint,
-                style = Stroke(width = 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round),
-            )
         }
     }
 }
