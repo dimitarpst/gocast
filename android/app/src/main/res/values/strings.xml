@@ -16,6 +16,9 @@
     <string name="tap_to_enter_code">Tap to enter pairing code</string>
     <string name="casting_to">Casting to %1$s</string>
     <string name="cast_live_label">Casting</string>
+    <string name="link_lan">Direct (LAN)</string>
+    <string name="link_internet">Direct (internet)</string>
+    <string name="link_relayed">Relayed</string>
     <string name="cast_paused_title">Paused</string>
     <string name="cast_paused_body">Your phone stopped sharing. Resume to continue on your PC.</string>
     <string name="resume_cast">Resume</string>

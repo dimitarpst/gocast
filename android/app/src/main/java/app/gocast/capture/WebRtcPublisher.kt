@@ -3,13 +3,17 @@ package app.gocast.capture
 import android.util.Log
 import app.gocast.domain.ConnectionState
 import app.gocast.network.CastConnection
+import app.gocast.network.CastLinkMonitor
 import app.gocast.network.PhoneIceServers
 import app.gocast.network.SignalingBridge
 import app.gocast.network.SignalingMessage
+import app.gocast.protocol.LinkClassifier
 import app.gocast.settings.CastQualitySettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -20,6 +24,7 @@ import org.webrtc.MediaConstraints
 import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
+import org.webrtc.RTCStats
 import org.webrtc.RtpParameters
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
@@ -38,6 +43,7 @@ class WebRtcPublisher(
     private var peerConnection: PeerConnection? = null
     private var collectJob: Job? = null
     private var announceJob: Job? = null
+    private var linkJob: Job? = null
     private var remoteDescriptionSet = false
     private val pendingIce = mutableListOf<IceCandidate>()
 
@@ -87,6 +93,7 @@ class WebRtcPublisher(
         collectJob = null
         announceJob?.cancel()
         announceJob = null
+        stopLinkWatch()
         scope.launch {
             disposePeerConnectionAsync()
         }
@@ -146,6 +153,7 @@ class WebRtcPublisher(
     private suspend fun disposePeerConnectionAsync() {
         val pc = peerConnection ?: return
         peerConnection = null
+        stopLinkWatch()
         withContext(Dispatchers.Default) {
             try {
                 pc.dispose()
@@ -172,6 +180,12 @@ class WebRtcPublisher(
             override fun onSignalingChange(state: PeerConnection.SignalingState?) = Unit
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
                 Log.i(TAG, "ICE connection: $state")
+                when (state) {
+                    PeerConnection.IceConnectionState.CONNECTED,
+                    PeerConnection.IceConnectionState.COMPLETED,
+                    -> startLinkWatch()
+                    else -> Unit
+                }
             }
             override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
             override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) = Unit
@@ -250,6 +264,44 @@ class WebRtcPublisher(
         )
     }
 
+    /** Polls the selected candidate pair: the path can move from relay to direct after connect. */
+    private fun startLinkWatch() {
+        if (linkJob?.isActive == true) return
+        linkJob = scope.launch {
+            while (isActive) {
+                val pc = peerConnection ?: break
+                runCatching { pc.getStats { report -> reportLink(report.statsMap) } }
+                delay(LINK_POLL_MS)
+            }
+        }
+    }
+
+    private fun stopLinkWatch() {
+        linkJob?.cancel()
+        linkJob = null
+        CastLinkMonitor.clear()
+    }
+
+    private fun reportLink(stats: Map<String, RTCStats>) {
+        val selectedId = stats.values
+            .firstOrNull { it.type == "transport" }
+            ?.members?.get("selectedCandidatePairId") as? String
+        val pair = selectedId?.let { stats[it] }
+            ?: stats.values.firstOrNull {
+                it.type == "candidate-pair" && it.members["nominated"] == true && it.members["state"] == "succeeded"
+            }
+            ?: return
+        val local = (pair.members["localCandidateId"] as? String)?.let { stats[it] }
+        val remote = (pair.members["remoteCandidateId"] as? String)?.let { stats[it] }
+        val type = LinkClassifier.classify(
+            localType = local?.members?.get("candidateType") as? String,
+            remoteType = remote?.members?.get("candidateType") as? String,
+            remoteAddress = (remote?.members?.get("address") ?: remote?.members?.get("ip")) as? String,
+            localAddress = (local?.members?.get("address") ?: local?.members?.get("ip")) as? String,
+        ) ?: return
+        if (CastLinkMonitor.update(type)) Log.i(TAG, "Cast link: ${type.label}")
+    }
+
     /** Put the preferred codec first in the offer so the hardware encoder is used. */
     private fun applyCodecPreference(pc: PeerConnection) {
         val wanted = quality.preferredCodec.name // matches SDP names: H264, H265, VP8, VP9, AV1
@@ -326,6 +378,7 @@ class WebRtcPublisher(
 
     companion object {
         private const val TAG = "WebRtcPublisher"
+        private const val LINK_POLL_MS = 5_000L
         /** Stereo music bitrate — WebRTC voice defaults are far lower. */
         private const val OPUS_MAX_AVERAGE_BITRATE_BPS = 256_000
 

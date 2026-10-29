@@ -9,6 +9,7 @@ import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -72,6 +73,12 @@ class KtorGocastServer(
                     RemoteSignaling.encodeIceServers(IceServerStore.current()),
                     ContentType.Application.Json,
                 )
+            }
+            post("/__gocast/link-type") {
+                // Direct (LAN) / Direct (internet) / Relayed, from the viewer's selected candidate pair.
+                val linkType = call.receiveText().trim().take(40).filter { it.isLetterOrDigit() || it in " ()·" }
+                if (linkType.isNotEmpty()) println("Cast link: $linkType")
+                call.respondText("ok")
             }
             post("/__gocast/disconnect") {
                 SignalingHub.disconnectPhone()

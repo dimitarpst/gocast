@@ -63,6 +63,8 @@ import app.gocast.domain.DiscoveredHost
 import app.gocast.protocol.JoinParams
 import app.gocast.domain.JoinUrlParser
 import app.gocast.domain.TrustedPc
+import app.gocast.network.CastLinkMonitor
+import app.gocast.protocol.LinkType
 import app.gocast.ui.components.DiscoveredHostCard
 import app.gocast.ui.components.ConnectionActionCard
 import app.gocast.ui.components.ConnectionActionSymbol
@@ -96,6 +98,7 @@ fun ConnectScreen(
     val discoveredHosts by viewModel.discoveredHosts.collectAsStateWithLifecycle()
     val joinBusy by viewModel.joinBusy.collectAsStateWithLifecycle()
     val castUiState by CaptureService.castUiState.collectAsStateWithLifecycle()
+    val linkType by CastLinkMonitor.linkType.collectAsStateWithLifecycle()
     var mode by remember {
         mutableStateOf(if (startWithQualitySettings) ConnectMode.Quality else ConnectMode.Home)
     }
@@ -282,6 +285,7 @@ fun ConnectScreen(
                     canJoin = canJoin,
                     isActiveCast = isActiveCast,
                     castPaused = castUiState == CaptureService.CastUiState.Paused,
+                    linkType = linkType,
                     joinBusy = joinBusy,
                     onCastTrusted = { viewModel.castToTrustedPc() },
                     onTrustedOffline = {
@@ -360,6 +364,7 @@ private fun HomeContent(
     canJoin: Boolean,
     isActiveCast: Boolean,
     castPaused: Boolean,
+    linkType: LinkType?,
     joinBusy: Boolean,
     onCastTrusted: () -> Unit,
     onTrustedOffline: () -> Unit,
@@ -394,6 +399,7 @@ private fun HomeContent(
             ActiveCastPanel(
                 displayName = trustedPc?.displayName,
                 paused = castPaused,
+                linkType = linkType,
                 onResume = onResume,
                 onStop = onStop,
                 modifier = Modifier
@@ -485,6 +491,7 @@ private fun HomeContent(
 private fun ActiveCastPanel(
     displayName: String?,
     paused: Boolean,
+    linkType: LinkType?,
     onResume: () -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
@@ -519,6 +526,22 @@ private fun ActiveCastPanel(
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
+        if (!paused && linkType != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(
+                    when (linkType) {
+                        LinkType.Lan -> R.string.link_lan
+                        LinkType.Internet -> R.string.link_internet
+                        LinkType.Relayed -> R.string.link_relayed
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (paused) {
             Spacer(Modifier.height(12.dp))
             Text(
