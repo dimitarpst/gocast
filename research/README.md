@@ -5,5 +5,7 @@ Keep product and design research here, alongside the app source. These files are
 - [Shared design direction for the Go apps](go-design-language.md) — foundations for a recognisable Go series / Goverse.
 - [Onboarding: animated guidance and connection recovery](onboarding/README.md) — 25 October 2026.
 - [Installation, maintenance, and updates](installation-and-updates.md) — existing MSI risks, legacy migration, and the GitHub update contract.
+- [PC name editing](pc-name-editing.md) — focused rename affordance and hover/keyboard behaviour.
+- [Connecting across networks](remote-connection.md) — how GoCast connects today and the Cloudflare signaling + TURN plan.
 
 For future research, distinguish observed behaviour, published guidance, proposed decisions, and questions that still need testing. Link the original sources and record their limitations. Do not store private screenshots, pairing codes, trust tokens, or device logs here.

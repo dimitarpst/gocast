@@ -1,6 +1,6 @@
 # GoCast tasks
 
-Updated: 25 October 2026. Owner: Codex unless marked user input or user validation.
+Updated: 29 October 2026. Owner: Codex unless marked user input or user validation.
 
 This is the persistent working list. Update it when work starts, scope changes, or a result is ready. Source changes and user-validated behaviour have separate statuses. Keep individual changes small enough to review and commit.
 
@@ -19,7 +19,10 @@ This is the persistent working list. Update it when work starts, scope changes, 
 - [ ] **UX-01 — Replace onboarding demonstrations with real contextual guidance.** Use the researched smooth overlay and failure-aware journey; no fake success or filler pages. See [research](research/onboarding/README.md).
 - [ ] **DES-01 — Establish the Go experience.** Consistent visual foundations across GoCast phone/PC and future Go apps. See [design direction](research/go-design-language.md).
 - [ ] **DES-02 — Explore a custom Go font and shared logo construction rules.** Record the two-colour vector direction as an input, not a finished specification.
-- [ ] **NET-01 — Discuss and diagnose phone-to-PC connection failure.** Explicitly deferred by the user. Do not change connection behaviour as part of UI or installer work without that discussion.
+- [ ] **NET-01 — Discuss and diagnose phone-to-PC connection failure.** Discussed 29 Oct: the user suspects dorm Wi-Fi client isolation (unconfirmed). Decision: connect across networks through Cloudflare signaling + STUN/TURN; see [plan](research/remote-connection.md). Do not change connection behaviour as part of UI or installer work.
+- [ ] **NET-02 — Signaling Worker + Durable Object** (`cloud/signal/`, local tests only, no deployment). Plan step 1; awaiting go-ahead.
+- [ ] **NET-03 — Room id in protocol/join link; desktop outbound signaling; Android remote transport + ICE servers.** Plan steps 2–4.
+- [ ] **NET-04 — Connection-type indicator, Cloudflare deployment (user-run), cross-network test matrix, resilience/budget guard.** Plan steps 5–7. Open decision: PC enrollment method.
 
 ## Implemented; user validation pending
 
@@ -30,7 +33,7 @@ This is the persistent working list. Update it when work starts, scope changes, 
 - [ ] **DEL-06 — Download and setup handoff.** Progress/cancel, bounded HTTPS redirects, size/SHA-256 verification, cached completed downloads across restarts, recheck before opening, and active-connection/cast guard implemented. Tests added for version/asset/redirect boundaries and changed downloads, but not run. SHA-256/TLS verifies delivery from the repository; independent publisher-signature validation is not implemented or claimed. Production signing belongs to DEL-08.
 - [ ] **DEV-01 — Refresh Phone / PC / Both launchers.** Update installed development apps without repetitive uninstalling; save session logs. Some earlier runs were checked, but this does not validate Windows installer maintenance.
 - [ ] **UI-02 — Reuse the approved QR symbol inside the scanner.** One vector resource shared with the action button; no build/device check performed for this change.
-- [ ] **UI-04 — PC identity header.** Compact rounded control groups the light PC name and Rename action; clicking it opens the existing modal. Corrected the black-on-dark regression by giving the name an explicit colour and establishing the desktop theme's default content colour. Removed the forced wide header sizing. The approved modal remains unchanged, with Save/Cancel, Enter/Escape, validation, and resize-safe draft state. User refresh/visual review pending; no build or app launch performed.
+- [ ] **UI-04 — PC identity header.** Removed the pill and permanent Rename text after user feedback. Name is a compact transparent clickable control; hover/keyboard focus reveals a faded edit icon and subtle surface, with space reserved to prevent movement. Opens the approved modal. Specific pattern research saved in [research/pc-name-editing.md](research/pc-name-editing.md). Refresh PC.cmd rebuilt and relaunched successfully (build 20261025-045230-571). Visual review pending.
 
 ## Completed research / recorded requirements
 
@@ -44,7 +47,7 @@ This is the persistent working list. Update it when work starts, scope changes, 
 
 ## Working agreements
 
-- The user runs builds, refreshes, installation, and device checks. Do not launch them automatically.
+- The agent may run the existing CMD launchers after completing changes (permission updated by the user). Keep build/refresh operations behind those launchers. Installer installation, publishing and device interaction are separate actions.
 - Keep the real GoCast logo and the approved QR action symbol.
 - Distinguish edits made from behaviour tested. Report limits plainly.
 - Keep the task list current and commit at meaningful checkpoints once Git history is available.
