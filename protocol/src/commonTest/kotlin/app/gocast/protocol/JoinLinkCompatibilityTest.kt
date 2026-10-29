@@ -65,4 +65,54 @@ class JoinLinkCompatibilityTest {
         assertEquals(JoinParams("pc", 8765, ""), JoinLink.parseParameters("pc:8765", ""))
         assertEquals(JoinParams("pc", 8765, " 123456 "), JoinLink.parseParameters("pc:8765", " 123456 "))
     }
+
+    @Test
+    fun roomIsAddedOnlyWhenPresent() {
+        assertEquals(
+            "https://cast.govrse.app/join?a=192.168.1.20:8765&t=ABCD&r=AbCdEfGhIjKlMnOpQrStUv",
+            JoinLink.create("192.168.1.20", 8765, "ABCD", "AbCdEfGhIjKlMnOpQrStUv"),
+        )
+        assertEquals(
+            "https://cast.govrse.app/join?a=192.168.1.20:8765&t=ABCD",
+            JoinLink.create("192.168.1.20", 8765, "ABCD", null),
+        )
+        // Never put a malformed room into a QR.
+        assertEquals(
+            "https://cast.govrse.app/join?a=192.168.1.20:8765&t=ABCD",
+            JoinLink.create("192.168.1.20", 8765, "ABCD", "bad room"),
+        )
+    }
+
+    @Test
+    fun roomIsParsedAlongsideTheExistingParameters() {
+        assertEquals(
+            JoinParams("192.168.1.20", 8765, "ABCD", "AbCdEfGhIjKlMnOpQrStUv"),
+            JoinLink.parseParameters("192.168.1.20:8765", "ABCD", "AbCdEfGhIjKlMnOpQrStUv"),
+        )
+    }
+
+    @Test
+    fun linksWithoutRoomStillParse() {
+        val params = JoinLink.parseParameters("192.168.1.20:8765", "ABCD")
+        assertEquals(JoinParams("192.168.1.20", 8765, "ABCD"), params)
+        assertNull(params?.roomId)
+        assertNull(JoinLink.parseParameters("192.168.1.20:8765", "ABCD", null)?.roomId)
+    }
+
+    @Test
+    fun malformedRoomFallsBackToLanOnly() {
+        for (room in listOf("", "short", "has spaces in the room", "a".repeat(65))) {
+            assertEquals(
+                JoinParams("192.168.1.20", 8765, "ABCD", null),
+                JoinLink.parseParameters("192.168.1.20:8765", "ABCD", room),
+                room,
+            )
+        }
+    }
+
+    @Test
+    fun roomDoesNotRescueABrokenLink() {
+        assertNull(JoinLink.parseParameters(null, "ABCD", "AbCdEfGhIjKlMnOpQrStUv"))
+        assertNull(JoinLink.parseParameters("pc", "ABCD", "AbCdEfGhIjKlMnOpQrStUv"))
+    }
 }
