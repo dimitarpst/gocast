@@ -216,7 +216,8 @@ class SignalingSession(
                 val relay = control.servers.any { server -> server.urls.any { it.startsWith("turn") } }
                 Log.i(TAG, "ICE servers from room: ${if (relay) "STUN+TURN" else "STUN only"}")
             }
-            is RemoteControl.PhoneJoined, is RemoteControl.PhoneLeft, RemoteControl.Pong -> Unit
+            // Relay status goes to the PC only; ignore it if it ever arrives here.
+            is RemoteControl.PhoneJoined, is RemoteControl.PhoneLeft, is RemoteControl.RelayStatus, RemoteControl.Pong -> Unit
             null -> return false
         }
         return true
