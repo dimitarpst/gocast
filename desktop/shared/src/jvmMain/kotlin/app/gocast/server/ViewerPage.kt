@@ -489,6 +489,70 @@ object ViewerPage {
     });
 
     let pc = null;
+    let linkType = null;
+    let linkTimer = null;
+
+    // Mirrors LinkClassifier in protocol/: private peer address = LAN, relay = relayed.
+    function isLocalAddress(address) {
+      if (!address) return false;
+      const value = String(address).trim().replace(/^\[|\]$/g, '').toLowerCase();
+      if (value.endsWith('.local')) return true;
+      const v4 = value.split('.');
+      if (v4.length === 4 && v4.every((p) => /^\d{1,3}$/.test(p) && Number(p) <= 255)) {
+        const a = Number(v4[0]);
+        const b = Number(v4[1]);
+        return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) ||
+          (a === 192 && b === 168) || (a === 169 && b === 254);
+      }
+      if (!value.includes(':')) return false;
+      const v6 = value.split('%')[0];
+      return v6 === '::1' || /^f[cd]/.test(v6) || /^fe[89ab]/.test(v6);
+    }
+
+    function classifyLink(local, remote) {
+      if (!local && !remote) return null;
+      const localType = local && local.candidateType;
+      const remoteType = remote && remote.candidateType;
+      if (localType === 'relay' || remoteType === 'relay') return 'Relayed';
+      const remoteAddress = remote && (remote.address || remote.ip);
+      if (remoteAddress) return isLocalAddress(remoteAddress) ? 'Direct (LAN)' : 'Direct (internet)';
+      const localAddress = local && (local.address || local.ip);
+      return remoteType === 'host' && isLocalAddress(localAddress) ? 'Direct (LAN)' : 'Direct (internet)';
+    }
+
+    function castingStatus() {
+      return linkType ? 'Casting · ' + linkType : 'Casting';
+    }
+
+    async function refreshLinkType() {
+      if (!pc || pc.connectionState !== 'connected') return;
+      let stats;
+      try { stats = await pc.getStats(); } catch (_) { return; }
+      let pair = null;
+      stats.forEach((report) => {
+        if (report.type === 'transport' && report.selectedCandidatePairId) {
+          pair = stats.get(report.selectedCandidatePairId) || pair;
+        }
+      });
+      if (!pair) {
+        stats.forEach((report) => {
+          if (report.type === 'candidate-pair' && report.nominated && report.state === 'succeeded') pair = report;
+        });
+      }
+      if (!pair) return;
+      const next = classifyLink(stats.get(pair.localCandidateId), stats.get(pair.remoteCandidateId));
+      if (!next || next === linkType) return;
+      linkType = next;
+      console.log('gocast link: ' + next);
+      fetch('/__gocast/link-type', { method: 'POST', body: next, cache: 'no-store' }).catch(() => {});
+      if (!streamPaused && (videoStream || audioStream)) setStatus(castingStatus());
+    }
+
+    function stopLinkWatch() {
+      clearInterval(linkTimer);
+      linkTimer = null;
+      linkType = null;
+    }
 
     async function currentIceServers() {
       try {
@@ -507,6 +571,7 @@ object ViewerPage {
       audioStream = null;
       video.srcObject = null;
       audio.srcObject = null;
+      stopLinkWatch();
       pc = new RTCPeerConnection({ iceServers });
       pc.ontrack = (event) => {
         const kind = event.track.kind;
@@ -533,7 +598,7 @@ object ViewerPage {
         const a = audioStream ? audioStream.getTracks().length : 0;
         if (v > 0 || a > 0) {
           setStreamPaused(false);
-          setStatus('Casting');
+          setStatus(castingStatus());
         }
       };
       pc.onconnectionstatechange = () => {
@@ -541,6 +606,10 @@ object ViewerPage {
         const state = pc.connectionState;
         if (state === 'connected') {
           setStatus('Connected');
+          // The pair can change (relay first, direct later), so keep looking.
+          refreshLinkType();
+          clearInterval(linkTimer);
+          linkTimer = setInterval(refreshLinkType, 5000);
         } else if (state === 'connecting') {
           setStatus('Connecting…');
         } else if (state === 'failed' || state === 'closed' || state === 'disconnected') {
