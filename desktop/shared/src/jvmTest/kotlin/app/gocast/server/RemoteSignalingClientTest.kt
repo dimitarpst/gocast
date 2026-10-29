@@ -1,6 +1,9 @@
 package app.gocast.server
 
 import app.gocast.protocol.IceServer
+import app.gocast.protocol.RelayError
+import app.gocast.protocol.RelayState
+import app.gocast.protocol.RemoteControl
 import app.gocast.protocol.RemoteSignaling
 import app.gocast.trust.DesktopIdentityStore
 import io.ktor.server.application.install
@@ -55,6 +58,33 @@ class RemoteSignalingClientTest {
         SignalingHub.disconnectPhone()
         worker.stop()
         IceServerStore.reset()
+        RelayAccess.clear()
+        RelayAccess.unlock = null
+    }
+
+    @Test
+    fun unlockingTheRelayReportsStatusAndFetchesRelayCredentials() = runBlocking {
+        withTimeout(30_000) {
+            client.start()
+            val pc = worker.nextConnection()
+            assertEquals(RemoteSignaling.GET_ICE_SERVERS, pc.next())
+            assertEquals(RemoteSignaling.GET_RELAY_STATUS, pc.next())
+            pc.send("""{"type":"relay-status","relay":"locked"}""")
+            assertEquals(RelayState.Locked, RelayAccess.status.first { it != null }?.state)
+
+            val unlock = checkNotNull(RelayAccess.unlock)
+            val wrong = async { unlock("nope") }
+            assertEquals(RemoteSignaling.relayUnlock("nope"), pc.next())
+            pc.send("""{"type":"relay-status","relay":"locked","error":"wrong-password"}""")
+            assertEquals(RemoteControl.RelayStatus(RelayState.Locked, RelayError.WrongPassword), wrong.await())
+
+            val right = async { unlock("secret") }
+            assertEquals(RemoteSignaling.relayUnlock("secret"), pc.next())
+            pc.send("""{"type":"relay-status","relay":"on"}""")
+            assertEquals(RelayState.On, right.await()?.state)
+            // Newly unlocked: relay credentials are fetched straight away.
+            assertEquals(RemoteSignaling.GET_ICE_SERVERS, pc.next())
+        }
     }
 
     @Test
@@ -66,6 +96,7 @@ class RemoteSignalingClientTest {
             assertEquals("pc", pc.role)
             assertEquals("Bearer $hostKey", pc.authorization)
             assertEquals(RemoteSignaling.GET_ICE_SERVERS, pc.next())
+            assertEquals(RemoteSignaling.GET_RELAY_STATUS, pc.next())
 
             // A wrong code is rejected and never reaches the hub.
             pc.send("""{"type":"phone-joined","phoneId":"p1"}""")
@@ -106,6 +137,7 @@ class RemoteSignalingClientTest {
             client.start()
             val pc = worker.nextConnection()
             assertEquals(RemoteSignaling.GET_ICE_SERVERS, pc.next())
+            assertEquals(RemoteSignaling.GET_RELAY_STATUS, pc.next())
             val relayed = """[{"urls":["stun:stun.cloudflare.com:3478"]},""" +
                 """{"urls":["turn:turn.cloudflare.com:3478?transport=udp"],"username":"u","credential":"c"}]"""
             pc.send("""{"type":"ice-servers","iceServers":$relayed}""")
@@ -131,6 +163,7 @@ class RemoteSignalingClientTest {
             client.start()
             val first = worker.nextConnection()
             assertEquals(RemoteSignaling.GET_ICE_SERVERS, first.next())
+            assertEquals(RemoteSignaling.GET_RELAY_STATUS, first.next())
             first.send("""{"type":"phone-joined","phoneId":"p1"}""")
             first.send("""{"type":"hello","token":"session-token","role":"phone"}""")
             assertEquals(RemoteSignaling.phoneAccepted("p1"), first.next())
@@ -142,6 +175,7 @@ class RemoteSignalingClientTest {
             val second = worker.nextConnection()
             assertEquals("Bearer $hostKey", second.authorization)
             assertEquals(RemoteSignaling.GET_ICE_SERVERS, second.next())
+            assertEquals(RemoteSignaling.GET_RELAY_STATUS, second.next())
             assertEquals(RemoteSignalingClient.State.Connected, client.state.first { it == RemoteSignalingClient.State.Connected })
         }
     }

@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { iceServersFor, isAllowedRoom } from "./ice";
+import { iceServersFor, isAllowedRoom, relayEnabled } from "./ice";
 
 // One object per PC room. All state lives in WebSocket tags/attachments and
 // storage, so the object can hibernate between messages.
@@ -11,7 +11,14 @@ type Attachment =
 const PING = '{"type":"ping"}';
 const PONG = '{"type":"pong"}';
 const HOST_KEY_HASH = "hostKeyHash";
+// Hash of the relay password this room was unlocked with. A new password locks every room.
+const RELAY_PASSWORD_HASH = "relayPasswordHash";
+const UNLOCK_FAILURES = "relayUnlockFailures";
+const MAX_UNLOCK_FAILURES = 5;
+const UNLOCK_WINDOW_MS = 60 * 60 * 1000;
 const MAX_MESSAGE_CHARS = 64 * 1024;
+
+type RelayState = "on" | "locked" | "off";
 
 // Close codes the apps can show or log.
 export const CLOSE_REPLACED = 4000;
@@ -114,7 +121,13 @@ export class SignalRoom extends DurableObject<Env> {
 	): Promise<void> {
 		switch (parsed?.type) {
 			case "get-ice-servers":
-				ws.send(await this.iceServersMessage(isAllowedRoom(this.env.ALLOWED_ROOMS, roomId)));
+				ws.send(await this.iceServersMessage(await this.roomMayRelay(roomId)));
+				return;
+			case "get-relay-status":
+				ws.send(await this.relayStatusMessage(roomId));
+				return;
+			case "relay-unlock":
+				ws.send(await this.unlockRelay(roomId, parsed.password));
 				return;
 			case "phone-accepted":
 				this.acceptPhone(String(parsed.phoneId ?? ""));
@@ -137,8 +150,7 @@ export class SignalRoom extends DurableObject<Env> {
 		parsed: Record<string, unknown> | null,
 	): Promise<void> {
 		if (parsed?.type === "get-ice-servers") {
-			const relayAllowed =
-				from.accepted && isAllowedRoom(this.env.ALLOWED_ROOMS, from.roomId);
+			const relayAllowed = from.accepted && (await this.roomMayRelay(from.roomId));
 			ws.send(await this.iceServersMessage(relayAllowed));
 			return;
 		}
@@ -182,6 +194,49 @@ export class SignalRoom extends DurableObject<Env> {
 	private async iceServersMessage(relayAllowed: boolean): Promise<string> {
 		const iceServers = await iceServersFor(this.env, relayAllowed);
 		return JSON.stringify({ type: "ice-servers", iceServers });
+	}
+
+	/** Allowlisted, or unlocked with the current relay password. */
+	private async roomMayRelay(roomId: string): Promise<boolean> {
+		if (isAllowedRoom(this.env.ALLOWED_ROOMS, roomId)) return true;
+		const password = this.env.RELAY_PASSWORD?.trim();
+		const stored = this.ctx.storage.kv.get<string>(RELAY_PASSWORD_HASH);
+		if (!password || stored === undefined) return false;
+		return sameHash(stored, await relayPasswordHash(roomId, password));
+	}
+
+	private async relayState(roomId: string): Promise<RelayState> {
+		if (!relayEnabled(this.env)) return "off";
+		if (await this.roomMayRelay(roomId)) return "on";
+		// Without a configured password there is nothing the PC can unlock.
+		return this.env.RELAY_PASSWORD?.trim() ? "locked" : "off";
+	}
+
+	private async relayStatusMessage(roomId: string, error?: string): Promise<string> {
+		const relay = await this.relayState(roomId);
+		return JSON.stringify({ type: "relay-status", relay, ...(error ? { error } : {}) });
+	}
+
+	private async unlockRelay(roomId: string, attempt: unknown): Promise<string> {
+		const now = Date.now();
+		const previous = this.ctx.storage.kv.get<{ count: number; since: number }>(UNLOCK_FAILURES);
+		const failures = previous && now - previous.since < UNLOCK_WINDOW_MS ? previous : { count: 0, since: now };
+		if (failures.count >= MAX_UNLOCK_FAILURES) {
+			return this.relayStatusMessage(roomId, "too-many-attempts");
+		}
+		const password = this.env.RELAY_PASSWORD?.trim();
+		if (!password) return this.relayStatusMessage(roomId);
+
+		const expected = await relayPasswordHash(roomId, password);
+		const given = typeof attempt === "string" ? await relayPasswordHash(roomId, attempt.trim()) : "";
+		if (!sameHash(expected, given)) {
+			this.ctx.storage.kv.put(UNLOCK_FAILURES, { count: failures.count + 1, since: failures.since });
+			return this.relayStatusMessage(roomId, "wrong-password");
+		}
+		this.ctx.storage.kv.put(RELAY_PASSWORD_HASH, expected);
+		this.ctx.storage.kv.delete(UNLOCK_FAILURES);
+		console.log(`room ${roomId} unlocked the relay`);
+		return this.relayStatusMessage(roomId);
 	}
 
 	private pcSocket(): WebSocket | undefined {
@@ -243,6 +298,11 @@ function bearerToken(request: Request): string | null {
 async function sha256(text: string): Promise<string> {
 	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
 	return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Salted with the room id, so stored hashes differ between rooms. */
+function relayPasswordHash(roomId: string, password: string): Promise<string> {
+	return sha256(`${roomId}:${password}`);
 }
 
 function sameHash(a: string, b: string): boolean {
