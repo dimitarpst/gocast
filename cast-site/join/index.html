@@ -104,6 +104,9 @@
       var params = new URLSearchParams(window.location.search);
       var a = params.get("a");
       var t = params.get("t");
+      // Optional remote room (newer PCs). Older links have no "r".
+      var r = params.get("r");
+      var room = r ? "&r=" + encodeURIComponent(r) : "";
       var open = document.getElementById("open-app");
       var title = document.getElementById("title");
       var blurb = document.getElementById("blurb");
@@ -121,7 +124,8 @@
         "https://cast.govrse.app/join?a=" +
         encodeURIComponent(a) +
         "&t=" +
-        encodeURIComponent(t);
+        encodeURIComponent(t) +
+        room;
 
       // App Links primary path — same https URL the Android intent-filter verifies.
       open.setAttribute("href", httpsJoin);
@@ -136,6 +140,7 @@
           encodeURIComponent(a) +
           "&t=" +
           encodeURIComponent(t) +
+          room +
           "#Intent;scheme=https;package=app.gocast;S.browser_fallback_url=" +
           encodeURIComponent(httpsJoin) +
           ";end";

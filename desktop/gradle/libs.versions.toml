@@ -26,6 +26,9 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref ="ktor" }
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 qrcodegen = { module = "io.nayuki:qrcodegen", version.ref = "qrcodegen" }
 # WebView2 (Wry) — package io.github.kdroidfilter.webview.*
 compose-webview-native = { module = "io.github.kdroidfilter:composewebview", version = "1.0.0-beta-02" }

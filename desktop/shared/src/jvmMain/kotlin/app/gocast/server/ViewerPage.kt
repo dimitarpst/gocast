@@ -1,7 +1,8 @@
 package app.gocast.server
 
 object ViewerPage {
-    fun html(token: String): String = """
+    /** @param iceServersJson RTCIceServer list from [app.gocast.protocol.RemoteSignaling.encodeIceServers]. */
+    fun html(token: String, iceServersJson: String = "[]"): String = """
 <!DOCTYPE html>
 <html lang="en" style="background:#12141A;color-scheme:dark">
 <head>
@@ -305,6 +306,8 @@ object ViewerPage {
   </div>
   <script>
     const TOKEN = ${token.toJsonString()};
+    // STUN/TURN from the signaling Worker; refreshed before each offer (credentials expire).
+    const INITIAL_ICE_SERVERS = $iceServersJson;
     const statusEl = document.getElementById('status');
     const pausedEl = document.getElementById('paused');
     const video = document.getElementById('video');
@@ -487,7 +490,16 @@ object ViewerPage {
 
     let pc = null;
 
-    function wirePeerConnection() {
+    async function currentIceServers() {
+      try {
+        const response = await fetch('/__gocast/ice-servers', { cache: 'no-store' });
+        const servers = await response.json();
+        if (Array.isArray(servers) && servers.length > 0) return servers;
+      } catch (_) {}
+      return INITIAL_ICE_SERVERS;
+    }
+
+    function wirePeerConnection(iceServers) {
       if (pc) {
         try { pc.close(); } catch (_) {}
       }
@@ -495,7 +507,7 @@ object ViewerPage {
       audioStream = null;
       video.srcObject = null;
       audio.srcObject = null;
-      pc = new RTCPeerConnection({ iceServers: [] });
+      pc = new RTCPeerConnection({ iceServers });
       pc.ontrack = (event) => {
         const kind = event.track.kind;
         if (kind === 'video') {
@@ -573,7 +585,7 @@ object ViewerPage {
       }
       if (msg.type === 'offer' && msg.sdp) {
         setStreamPaused(false);
-        wirePeerConnection();
+        wirePeerConnection(await currentIceServers());
         await pc.setRemoteDescription({ type: 'offer', sdp: msg.sdp });
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
