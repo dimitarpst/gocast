@@ -17,6 +17,7 @@ class JvmSessionFactory(
             shortCode = ShortCodeGenerator.generate(),
             instanceId = identity.instanceId,
             displayName = identity.displayName,
+            roomId = identity.roomId,
         )
     }
 }

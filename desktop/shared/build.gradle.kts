@@ -36,6 +36,10 @@ kotlin {
             implementation(libs.ktor.server.netty)
             implementation(libs.qrcodegen)
             implementation(libs.ktor.server.websockets)
+            // Outbound connection to the signaling Worker (remote casting).
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.client.websockets)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.compose.webview.native)
             implementation(libs.jmdns)

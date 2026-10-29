@@ -1,7 +1,6 @@
 package app.gocast.server
 
-import app.gocast.protocol.HelloMessage
-import app.gocast.protocol.HelloOkMessage
+import app.gocast.protocol.RemoteSignaling
 import app.gocast.trust.DesktopIdentityStore
 import io.ktor.http.ContentType
 import io.ktor.server.application.Application
@@ -18,22 +17,23 @@ import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
 import io.ktor.server.websocket.timeout
 import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
+import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
-import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
 
 class KtorGocastServer(
-    private val identityStore: DesktopIdentityStore = DesktopIdentityStore(),
+    identityStore: DesktopIdentityStore = DesktopIdentityStore(),
 ) : GocastServer {
 
     companion object {
         private const val GRACE_PERIOD_MILLIS = 1000L
         private const val TIMEOUT_MILLIS = 2000L
-        private val json = Json { ignoreUnknownKeys = true }
     }
 
+    private val phoneProtocol = PhoneProtocol(identityStore)
     private var engine: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
     override val isRunning: Boolean get() = engine != null
 
@@ -63,7 +63,15 @@ class KtorGocastServer(
             }
             get("/view") {
                 val token = SessionGuard.expectedToken.orEmpty()
-                call.respondText(ViewerPage.html(token), ContentType.Text.Html)
+                val iceServers = RemoteSignaling.encodeIceServers(IceServerStore.current())
+                call.respondText(ViewerPage.html(token, iceServers), ContentType.Text.Html)
+            }
+            // The viewer asks before each offer so relay credentials never go stale.
+            get("/__gocast/ice-servers") {
+                call.respondText(
+                    RemoteSignaling.encodeIceServers(IceServerStore.current()),
+                    ContentType.Application.Json,
+                )
             }
             post("/__gocast/disconnect") {
                 SignalingHub.disconnectPhone()
@@ -83,13 +91,14 @@ class KtorGocastServer(
             }
             webSocket("/ws") {
                 var role: String? = null
+                val phoneLink = LanPhoneLink(this)
                 try {
                     val first = incoming.receive() as? Frame.Text ?: run {
                         close()
                         return@webSocket
                     }
-                    val hello = json.decodeFromString<HelloMessage>(first.readText())
-                    if (hello.type != "hello" || !SessionGuard.isAuthorized(hello.token)) {
+                    val hello = phoneProtocol.parseHello(first.readText())
+                    if (hello == null || hello.type != "hello" || !SessionGuard.isAuthorized(hello.token)) {
                         close()
                         return@webSocket
                     }
@@ -97,14 +106,12 @@ class KtorGocastServer(
                     role = hello.role
                     when (role) {
                         "phone" -> {
-                            SignalingHub.setPhone(this)
-                            val trustToken = resolveTrustToken(hello.token)
-                            val ok = HelloOkMessage(
-                                trustToken = trustToken,
-                                instanceId = SessionGuard.instanceId,
-                                displayName = SessionGuard.displayName,
-                            )
-                            send(Frame.Text(json.encodeToString(HelloOkMessage.serializer(), ok)))
+                            val ok = phoneProtocol.helloReply(hello) ?: run {
+                                close()
+                                return@webSocket
+                            }
+                            SignalingHub.setPhone(phoneLink)
+                            send(Frame.Text(phoneProtocol.encode(ok)))
                         }
                         "viewer" -> {
                             SignalingHub.setViewer(this)
@@ -121,27 +128,13 @@ class KtorGocastServer(
                         if (frame !is Frame.Text) continue
                         val text = frame.readText()
                         when (role) {
-                            "phone" -> {
-                                val type = signalingType(text)
-                                if (type == "phone-media-ready") {
-                                    // After MediaProjection accept — not mere WS/QR connect.
-                                    SignalingHub.markCastingActive()
-                                    if (SignalingHub.hasViewer()) {
-                                        SignalingHub.sendToPhone("""{"type":"viewer-ready"}""")
-                                    }
-                                } else {
-                                    if (type == "offer") {
-                                        SignalingHub.markCastingActive()
-                                    }
-                                    SignalingHub.sendToViewer(text)
-                                }
-                            }
+                            "phone" -> phoneProtocol.onPhoneMessage(text)
                             "viewer" -> SignalingHub.sendToPhone(text)
                         }
                     }
                 } finally {
                     when (role) {
-                        "phone" -> SignalingHub.clearPhone(this)
+                        "phone" -> SignalingHub.clearPhone(phoneLink)
                         "viewer" -> SignalingHub.clearViewer(this)
                     }
                 }
@@ -149,22 +142,11 @@ class KtorGocastServer(
         }
     }
 
-    private fun resolveTrustToken(presentedToken: String): String {
-        if (!SessionGuard.isSessionCredential(presentedToken)) {
-            return presentedToken.trim()
-        }
-        val trust = identityStore.newTrustToken()
-        SessionGuard.addTrusted(trust)
-        identityStore.saveTrustedTokens(SessionGuard.trustedSnapshot())
-        return trust
-    }
+    /** A phone on the LAN socket; unchanged behaviour, now behind [PhoneLink]. */
+    private class LanPhoneLink(private val session: WebSocketSession) : PhoneLink {
+        override suspend fun send(text: String) = session.send(Frame.Text(text))
 
-    private fun signalingType(text: String): String? = try {
-        json.decodeFromString<SignalingTypeOnly>(text).type
-    } catch (_: Exception) {
-        null
+        override suspend fun close(reason: String) =
+            session.close(CloseReason(CloseReason.Codes.NORMAL, reason))
     }
 }
-
-@kotlinx.serialization.Serializable
-private data class SignalingTypeOnly(val type: String)
