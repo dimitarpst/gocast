@@ -3,6 +3,7 @@ package app.gocast.capture
 import android.util.Log
 import app.gocast.domain.ConnectionState
 import app.gocast.network.CastConnection
+import app.gocast.network.PhoneIceServers
 import app.gocast.network.SignalingBridge
 import app.gocast.network.SignalingMessage
 import app.gocast.settings.CastQualitySettings
@@ -155,7 +156,16 @@ class WebRtcPublisher(
     }
 
     private fun buildAndSendOffer() {
-        val rtcConfig = PeerConnection.RTCConfiguration(emptyList()).apply {
+        // STUN/TURN from the signaling room (STUN only on LAN-only joins). Host candidates
+        // stay, so a phone on the same Wi-Fi still gets the direct LAN path.
+        val iceServers = PhoneIceServers.current().map { server ->
+            PeerConnection.IceServer.builder(server.urls).apply {
+                server.username?.let { setUsername(it) }
+                server.credential?.let { setPassword(it) }
+            }.createIceServer()
+        }
+        Log.i(TAG, "ICE servers: ${iceServers.flatMap { it.urls }.joinToString { it.substringBefore('?') }}")
+        val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
         }
         val observer = object : PeerConnection.Observer {
