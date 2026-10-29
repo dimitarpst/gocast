@@ -269,8 +269,11 @@ fun ConnectScreen(
     ) {
         when (mode) {
             ConnectMode.Home -> {
-                val trustedOnline = trustedPc != null &&
-                    discoveredHosts.any { it.instanceId == trustedPc!!.instanceId }
+                // A PC with a room is reachable through the internet, so it needs no mDNS sighting.
+                val trustedOnline = trustedPc != null && (
+                    trustedPc!!.roomId != null ||
+                        discoveredHosts.any { it.instanceId == trustedPc!!.instanceId }
+                    )
                 HomeContent(
                     label = label,
                     connectionState = connectionState,

@@ -11,7 +11,9 @@ object JoinUrlParser {
 
         val a = uri.getQueryParameter(JoinLink.AUTHORITY_PARAMETER) ?: return null
         val token = uri.getQueryParameter(JoinLink.TOKEN_PARAMETER) ?: return null
-        return JoinLink.parseParameters(a, token)
+        // Older QR codes have no room; the link still works over the LAN.
+        val room = uri.getQueryParameter(JoinLink.ROOM_PARAMETER)
+        return JoinLink.parseParameters(a, token, room)
     }
 
     /** Parses `host:port` or `[ipv6]:port`. */

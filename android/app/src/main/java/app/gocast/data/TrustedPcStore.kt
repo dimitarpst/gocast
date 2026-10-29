@@ -2,6 +2,7 @@ package app.gocast.data
 
 import android.content.Context
 import app.gocast.domain.TrustedPc
+import app.gocast.protocol.RoomId
 import org.json.JSONObject
 
 class TrustedPcStore(context: Context) {
@@ -17,6 +18,8 @@ class TrustedPcStore(context: Context) {
                 port = obj.getInt("port"),
                 instanceId = obj.getString("instanceId"),
                 trustToken = obj.getString("trustToken"),
+                // Saved before remote casting existed: no room, trust token still valid.
+                roomId = obj.optString("roomId").takeIf { RoomId.isValid(it) },
             )
         }.getOrNull()
     }
@@ -28,6 +31,7 @@ class TrustedPcStore(context: Context) {
             .put("port", pc.port)
             .put("instanceId", pc.instanceId)
             .put("trustToken", pc.trustToken)
+        pc.roomId?.let { obj.put("roomId", it) }
         prefs.edit().putString(KEY, obj.toString()).apply()
     }
 

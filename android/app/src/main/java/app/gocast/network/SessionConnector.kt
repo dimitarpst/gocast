@@ -38,13 +38,14 @@ class SessionConnector(
                 } else {
                     ConnectionState.Reconnecting
                 }
-                when (val result = session.open(params.host, params.port, params.token)) {
+                when (val result = session.open(params)) {
                     is HelloResult.Ok -> {
                         _state.value = ConnectionState.Connected
                         _paired.tryEmit(
                             PairedSession(
                                 host = params.host,
                                 port = params.port,
+                                roomId = params.roomId,
                                 trustToken = result.trustToken,
                                 instanceId = result.instanceId,
                                 displayName = result.displayName,
@@ -83,6 +84,7 @@ class SessionConnector(
 data class PairedSession(
     val host: String,
     val port: Int,
+    val roomId: String?,
     val trustToken: String?,
     val instanceId: String?,
     val displayName: String?,

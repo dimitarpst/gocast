@@ -47,17 +47,21 @@ object LanHealthProbe {
         }
     }
 
-    fun explainFailure(host: String, port: Int, cause: Throwable?): String {
+    /** @param triedRemote the signaling room was tried first and the PC wasn't there either. */
+    fun explainFailure(host: String, port: Int, cause: Throwable?, triedRemote: Boolean = false): String {
         return when (check(host, port)) {
             Result.GocastOk ->
                 "Reached the PC but casting didn't start — open gocast on the PC and scan again."
             Result.NotGocast ->
                 "Something else is using $host:$port — make sure gocast is running on the PC."
-            Result.Unreachable -> unreachableMessage(cause)
+            Result.Unreachable -> unreachableMessage(cause, triedRemote)
         }
     }
 
-    private fun unreachableMessage(cause: Throwable?): String {
+    private fun unreachableMessage(cause: Throwable?, triedRemote: Boolean): String {
+        if (triedRemote) {
+            return "Can't reach the PC over the internet or this Wi‑Fi. Is gocast open on the PC?"
+        }
         val tip =
             "Same Wi‑Fi (not guest)? VPN off? On the PC, allow gocast through Windows Firewall."
         return when (cause) {
