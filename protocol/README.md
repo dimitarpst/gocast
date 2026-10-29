@@ -3,7 +3,10 @@
 Kotlin Multiplatform code shared by the Android sender and desktop receiver:
 
 - WebSocket hello and successful-handshake messages.
-- Join parameters and the existing QR join-link format.
+- Join parameters and the existing QR join-link format, plus the optional remote
+  room (`r`). Links without `r`, or with a malformed one, still join over the LAN.
+- Control messages and ICE server lists for the signaling Worker (`cloud/signal`),
+  and its address (`RemoteSignaling.BASE_URL`).
 - Host/port formatting and parsing, including bracketed IPv6 addresses.
 
 Both `android/` and `desktop/` include this directory as `:protocol`. Open either
