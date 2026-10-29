@@ -1,6 +1,7 @@
 package app.gocast.server
 
 import app.gocast.protocol.IceServer
+import app.gocast.protocol.RelayState
 import app.gocast.protocol.RemoteControl
 import app.gocast.protocol.RemoteSignaling
 import app.gocast.trust.DesktopIdentityStore
@@ -63,6 +64,9 @@ class RemoteSignalingClient(
     @Volatile
     private var iceReply: CompletableDeferred<List<IceServer>>? = null
 
+    @Volatile
+    private var unlockReply: CompletableDeferred<RemoteControl.RelayStatus>? = null
+
     fun start() {
         if (job?.isActive == true) return
         job = scope.launch { runForever() }
@@ -104,16 +108,23 @@ class RemoteSignalingClient(
         link = session
         _state.value = State.Connected
         IceServerStore.refresh = ::requestIceServers
+        RelayAccess.unlock = ::requestUnlock
         println("Remote signaling connected: room $roomId")
         // The Worker answers pings without waking the room; this only keeps the socket open.
         val pinger = session.launch {
+            var pings = 0
             while (true) {
                 delay(PING_INTERVAL_MS)
                 session.send(Frame.Text(RemoteSignaling.PING))
+                // The relay can be unlocked elsewhere or switched off by a redeploy.
+                if (++pings % RELAY_STATUS_EVERY_PINGS == 0) {
+                    session.send(Frame.Text(RemoteSignaling.GET_RELAY_STATUS))
+                }
             }
         }
         try {
             session.send(Frame.Text(RemoteSignaling.GET_ICE_SERVERS))
+            session.send(Frame.Text(RemoteSignaling.GET_RELAY_STATUS))
             for (frame in session.incoming) {
                 if (frame is Frame.Text) handle(session, frame.readText())
             }
@@ -125,8 +136,12 @@ class RemoteSignalingClient(
     private suspend fun disconnected() {
         link = null
         if (IceServerStore.refresh == ::requestIceServers) IceServerStore.refresh = null
+        if (RelayAccess.unlock == ::requestUnlock) RelayAccess.unlock = null
+        RelayAccess.clear()
         iceReply?.cancel()
         iceReply = null
+        unlockReply?.cancel()
+        unlockReply = null
         pendingPhoneId = null
         acceptedPhone?.let { SignalingHub.clearPhone(it) }
         acceptedPhone = null
@@ -148,6 +163,18 @@ class RemoteSignalingClient(
             is RemoteControl.IceServers -> {
                 IceServerStore.update(control.servers)
                 iceReply?.complete(control.servers)
+            }
+            is RemoteControl.RelayStatus -> {
+                val before = RelayAccess.status.value?.state
+                RelayAccess.update(control)
+                if (control.state != before || control.error != null) {
+                    println("Relay: ${control.state}${control.error?.let { " ($it)" } ?: ""}")
+                }
+                unlockReply?.complete(control)
+                // Just unlocked: fetch relay credentials now instead of at the next refresh.
+                if (control.state == RelayState.On && before == RelayState.Locked) {
+                    session.send(Frame.Text(RemoteSignaling.GET_ICE_SERVERS))
+                }
             }
             RemoteControl.Pong -> Unit
             // The Worker only forwards hello from a waiting phone and everything from the accepted one.
@@ -186,6 +213,16 @@ class RemoteSignalingClient(
         }.getOrNull().also { if (iceReply === reply) iceReply = null }
     }
 
+    private suspend fun requestUnlock(password: String): RemoteControl.RelayStatus? {
+        val session = link ?: return null
+        val reply = CompletableDeferred<RemoteControl.RelayStatus>()
+        unlockReply = reply
+        return runCatching {
+            session.send(Frame.Text(RemoteSignaling.relayUnlock(password)))
+            withTimeoutOrNull(ICE_REPLY_TIMEOUT_MS) { reply.await() }
+        }.getOrNull().also { if (unlockReply === reply) unlockReply = null }
+    }
+
     /** One phone behind the Worker link. Closing it drops only that phone, not the link. */
     private class RemotePhoneLink(val phoneId: String, private val session: WebSocketSession) : PhoneLink {
         override suspend fun send(text: String) = session.send(Frame.Text(text))
@@ -197,6 +234,8 @@ class RemoteSignalingClient(
 
     companion object {
         private const val PING_INTERVAL_MS = 30_000L
+        /** About every 10 minutes. */
+        private const val RELAY_STATUS_EVERY_PINGS = 20
         private const val ICE_REPLY_TIMEOUT_MS = 5_000L
         private val RECONNECT_DELAYS_MS = longArrayOf(2_000L, 5_000L, 10_000L, 30_000L, 60_000L)
 

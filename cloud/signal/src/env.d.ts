@@ -9,6 +9,8 @@ declare namespace Cloudflare {
 		RELAY_ENABLED?: string;
 		/** Secret: comma-separated room ids that may receive TURN credentials. */
 		ALLOWED_ROOMS?: string;
+		/** Secret: typed once into a PC to unlock the relay for its room. */
+		RELAY_PASSWORD?: string;
 		/** Secrets from the Cloudflare TURN key. */
 		TURN_KEY_ID?: string;
 		TURN_KEY_API_TOKEN?: string;

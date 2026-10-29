@@ -24,12 +24,15 @@ object RemoteSignaling {
     const val PING = """{"type":"ping"}"""
     const val PONG = """{"type":"pong"}"""
     const val GET_ICE_SERVERS = """{"type":"get-ice-servers"}"""
+    const val GET_RELAY_STATUS = """{"type":"get-relay-status"}"""
 
     const val TYPE_PHONE_JOINED = "phone-joined"
     const val TYPE_PHONE_LEFT = "phone-left"
     const val TYPE_PHONE_ACCEPTED = "phone-accepted"
     const val TYPE_PHONE_REJECTED = "phone-rejected"
     const val TYPE_ICE_SERVERS = "ice-servers"
+    const val TYPE_RELAY_STATUS = "relay-status"
+    const val TYPE_RELAY_UNLOCK = "relay-unlock"
 
     /** Worker close codes. */
     const val CLOSE_PC_REPLACED: Short = 4000
@@ -49,6 +52,10 @@ object RemoteSignaling {
     fun phoneRejected(phoneId: String): String =
         json.encodeToString(PhoneDecision.serializer(), PhoneDecision(TYPE_PHONE_REJECTED, phoneId))
 
+    /** PC only: the owner's relay password, checked by the Worker for this room. */
+    fun relayUnlock(password: String): String =
+        json.encodeToString(RelayUnlock.serializer(), RelayUnlock(TYPE_RELAY_UNLOCK, password))
+
     /** RTCIceServer-shaped JSON for the browser viewer. */
     fun encodeIceServers(servers: List<IceServer>): String =
         json.encodeToString(ListSerializer(IceServer.serializer()), servers)
@@ -64,6 +71,9 @@ object RemoteSignaling {
                 TYPE_PHONE_LEFT -> RemoteControl.PhoneLeft(phoneId(obj) ?: return null)
                 TYPE_ICE_SERVERS ->
                     RemoteControl.IceServers(json.decodeFromJsonElement<IceServersMessage>(obj).iceServers)
+                TYPE_RELAY_STATUS -> json.decodeFromJsonElement<RelayStatusMessage>(obj).let {
+                    RemoteControl.RelayStatus(RelayState.parse(it.relay), RelayError.parse(it.error))
+                }
                 "pong" -> RemoteControl.Pong
                 else -> null
             }
@@ -78,7 +88,41 @@ sealed interface RemoteControl {
     data class PhoneJoined(val phoneId: String) : RemoteControl
     data class PhoneLeft(val phoneId: String) : RemoteControl
     data class IceServers(val servers: List<IceServer>) : RemoteControl
+    data class RelayStatus(val state: RelayState, val error: RelayError? = null) : RemoteControl
     data object Pong : RemoteControl
+}
+
+/** Whether this PC's room may use the TURN relay. */
+enum class RelayState {
+    /** Unlocked (or allowlisted) and the relay is switched on. */
+    On,
+    /** The owner's password would unlock it. */
+    Locked,
+    /** Switched off on the Worker, or no password configured. */
+    Off,
+    ;
+
+    companion object {
+        fun parse(value: String?): RelayState = when (value) {
+            "on" -> On
+            "locked" -> Locked
+            else -> Off
+        }
+    }
+}
+
+enum class RelayError {
+    WrongPassword,
+    TooManyAttempts,
+    ;
+
+    companion object {
+        fun parse(value: String?): RelayError? = when (value) {
+            "wrong-password" -> WrongPassword
+            "too-many-attempts" -> TooManyAttempts
+            else -> null
+        }
+    }
 }
 
 @Serializable
@@ -98,3 +142,9 @@ private data class PhoneDecision(val type: String, val phoneId: String)
 
 @Serializable
 private data class IceServersMessage(val type: String, val iceServers: List<IceServer> = emptyList())
+
+@Serializable
+private data class RelayUnlock(val type: String, val password: String)
+
+@Serializable
+private data class RelayStatusMessage(val type: String, val relay: String? = null, val error: String? = null)

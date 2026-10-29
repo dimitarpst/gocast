@@ -30,6 +30,32 @@ class RemoteSignalingTest {
             """{"type":"phone-rejected","phoneId":"p-1"}""",
             RemoteSignaling.phoneRejected("p-1"),
         )
+        assertEquals("""{"type":"get-relay-status"}""", RemoteSignaling.GET_RELAY_STATUS)
+        assertEquals(
+            """{"type":"relay-unlock","password":"pa\"ss"}""",
+            RemoteSignaling.relayUnlock("pa\"ss"),
+        )
+    }
+
+    @Test
+    fun parsesRelayStatus() {
+        assertEquals(
+            RemoteControl.RelayStatus(RelayState.On),
+            RemoteSignaling.parseControl("""{"type":"relay-status","relay":"on"}"""),
+        )
+        assertEquals(
+            RemoteControl.RelayStatus(RelayState.Locked, RelayError.WrongPassword),
+            RemoteSignaling.parseControl("""{"type":"relay-status","relay":"locked","error":"wrong-password"}"""),
+        )
+        assertEquals(
+            RemoteControl.RelayStatus(RelayState.Locked, RelayError.TooManyAttempts),
+            RemoteSignaling.parseControl("""{"type":"relay-status","relay":"locked","error":"too-many-attempts"}"""),
+        )
+        // Unknown values degrade to "off" rather than claiming the relay works.
+        assertEquals(
+            RemoteControl.RelayStatus(RelayState.Off),
+            RemoteSignaling.parseControl("""{"type":"relay-status","relay":"maybe","error":"new"}"""),
+        )
     }
 
     @Test

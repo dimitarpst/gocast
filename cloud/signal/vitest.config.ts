@@ -24,6 +24,7 @@ export default defineConfig({
 			miniflare: {
 				bindings: {
 					ALLOWED_ROOMS: "allowedRoomAAAAAAAAAAA, allowedRoomBBBBBBBBBBB",
+					RELAY_PASSWORD: "test-relay-password",
 					TURN_KEY_ID: "test-key-id",
 					TURN_KEY_API_TOKEN: "test-api-token",
 				},

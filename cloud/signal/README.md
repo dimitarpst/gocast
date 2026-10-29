@@ -8,8 +8,8 @@ over WebRTC: directly when possible, through Cloudflare TURN only as a last reso
 - The PC claims its room with a host key (sent as `Authorization: Bearer …`).
   The object stores only the key's SHA-256.
 - One phone at a time. The PC still checks codes and trust tokens itself.
-- STUN (`stun.cloudflare.com`) for everyone. TURN credentials only for the PC of
-  an allowlisted room and the phone that PC accepted.
+- STUN (`stun.cloudflare.com`) for everyone. TURN credentials only for a PC
+  unlocked with the relay password (or allowlisted) and the phone that PC accepted.
 - Idle rooms hibernate; pings are answered without waking them.
 
 Nothing here is deployed by the repository. You run the steps below yourself.
@@ -55,22 +55,25 @@ Run these from `cloud/signal/`. Node 20+ is enough.
 
 ## Allow a PC to use the relay
 
-1. Start GoCast on the PC. It logs `Remote room id: <id>` at startup. The same id
-   is saved as `roomId` in `%LOCALAPPDATA%\gocast\identity.json`.
-2. Set the allowlist secret to all allowed room ids, comma-separated. This
-   replaces the old list, so include every PC:
+Set a relay password once (pick something long, like four random words):
 
-   ```bash
-   npx wrangler secret put ALLOWED_ROOMS
-   ```
+```bash
+npx wrangler secret put RELAY_PASSWORD
+```
 
-   Example value: `Xq3…roomOne,Ab9…roomTwo`
+Then on each PC, click **Unlock relay** at the bottom of the GoCast window and
+type the password. The Worker remembers that PC; you never type it again there.
+The button only appears while the PC is connected to the signaling server.
 
-Rooms not on the list can still connect (direct only, STUN).
+- Five wrong tries lock that PC's attempts for an hour.
+- Changing `RELAY_PASSWORD` locks every PC again until it's re-entered.
+- PCs that aren't unlocked still connect, direct only (STUN).
+
+Alternative without the app: put room ids (from the PC log line
+`Remote room id: …`) in the `ALLOWED_ROOMS` secret, comma-separated.
 
 Keep room ids private: anyone with a room id can knock on that PC (it still
-needs the pairing code or a trust token). That's why the list is a secret and
-not in `wrangler.toml`.
+needs the pairing code or a trust token).
 
 ## Relay kill switch
 
@@ -95,6 +98,8 @@ Existing GoCast messages pass through unchanged. The Worker adds only these:
 | PC → Worker | `{"type":"phone-accepted","phoneId":"…"}` | Hello was valid. Replaces any earlier phone. |
 | PC → Worker | `{"type":"phone-rejected","phoneId":"…"}` | Hello was invalid; the phone is closed. |
 | PC or phone → Worker | `{"type":"get-ice-servers"}` | Reply: `{"type":"ice-servers","iceServers":[…]}` |
+| PC → Worker | `{"type":"get-relay-status"}` | Reply: `{"type":"relay-status","relay":"on\|locked\|off"}` |
+| PC → Worker | `{"type":"relay-unlock","password":"…"}` | Same reply, plus `"error":"wrong-password"` or `"too-many-attempts"` on failure. |
 | PC or phone → Worker | `{"type":"ping"}` | Reply: `{"type":"pong"}` (answered without waking the room). |
 
 Before the PC accepts it, a phone may only send `hello`.
