@@ -1,6 +1,6 @@
 # Connecting across networks (Cloudflare signaling + STUN/TURN)
 
-Recorded: 29 October 2026. Status: proposed plan; nothing implemented, deployed, or tested.
+Recorded: 29 October 2026. Status: steps 1–5 implemented on a branch (see "Implementation notes"); nothing deployed or tested on devices.
 
 ## Goal
 
@@ -51,5 +51,19 @@ Security note: SDP passes through the user's own Worker over WSS. DTLS still enc
 
 ## Open decisions
 
-- PC enrollment method: an owner key pasted once into each PC, or an allowlist edited with `wrangler`.
 - When the remote path is validated: keep or retire LAN signaling and the 8765 firewall rule.
+- Budget guard (step 7): usage source still undecided; today only the manual `RELAY_ENABLED` kill switch exists.
+
+## Implementation notes (29 October, steps 1–5)
+
+Where the code differs from the plan above, or fills a gap it left open:
+
+- **Enrollment:** decided for now as an allowlist. `ALLOWED_ROOMS` is a Worker secret edited with `wrangler secret put`; the PC logs `Remote room id: …` at startup. Rooms not on the list still signal, but get STUN only.
+- **Worker messages:** the PC decides acceptance. The Worker adds `phone-joined`/`phone-left` (to the PC), `phone-accepted`/`phone-rejected` (from the PC), `get-ice-servers`/`ice-servers`, and a `{"type":"ping"}` the room answers without waking. A waiting phone may only send `hello`.
+- **One phone per room:** a newly accepted phone replaces the current one (the old one receives `session-ended`), matching what the LAN socket already did.
+- **Credentials:** 4 h TTL. The viewer re-fetches `/__gocast/ice-servers` before every offer; the PC and the phone ask the Worker again after 3 h. Port-53 URLs are dropped.
+- **Order on the phone:** Worker first, then LAN on 8765. A PC rejection over the Worker is reported as a wrong code without the LAN retry. With a room, trusted reconnect still looks at mDNS for 0.8 s only to refresh the LAN address.
+- **Join page:** `cast.govrse.app/join` forwards `r` in its Open/intent links; links without `r` behave as before.
+- **Indicator:** classification lives in `protocol/LinkClassifier` (private peer address = LAN, relay candidate = relayed) with a JS mirror in the viewer. Whether WebView2 exposes remote candidate addresses in `getStats` is unverified; the fallback uses candidate types.
+- **Not done (step 7):** ICE restart on network change, mid-session credential refresh via `setConfiguration`, budget enforcement/revocation.
+- **Not run:** Android and Compose builds (Google Maven blocked in the sandbox); `wrangler dev`; any device or cross-network test.

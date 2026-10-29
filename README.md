@@ -43,6 +43,7 @@ gocast does one job, cleanly.
 | `desktop/` | Windows app |
 | `protocol/` | Kotlin Multiplatform connection messages and pairing rules shared by both apps |
 | `cast-site/` | Join links for `cast.govrse.app` |
+| `cloud/signal/` | Cloudflare signaling Worker for casting across networks (in development, not deployed) |
 | `branding/` | Logos and marks |
 
 ## Develop
