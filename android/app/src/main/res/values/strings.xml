@@ -18,9 +18,6 @@
     <string name="tap_to_enter_code">Tap to enter pairing code</string>
     <string name="casting_to">Casting to %1$s</string>
     <string name="cast_live_label">Casting</string>
-    <string name="link_lan">Direct (LAN)</string>
-    <string name="link_internet">Direct (internet)</string>
-    <string name="link_relayed">Relayed</string>
     <string name="codec_fallback">Your PC can\'t play %1$s, so gocast is using %2$s.</string>
     <string name="codec_fallback_phone">This phone couldn\'t start %1$s, so gocast is using %2$s.</string>
     <string name="cast_paused_title">Paused</string>
