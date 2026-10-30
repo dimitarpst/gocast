@@ -44,6 +44,8 @@ class WebRtcPublisher(
     private var collectJob: Job? = null
     private var announceJob: Job? = null
     private var linkJob: Job? = null
+    @Volatile
+    private var stopped = false
     private var remoteDescriptionSet = false
     private val pendingIce = mutableListOf<IceCandidate>()
 
@@ -89,14 +91,30 @@ class WebRtcPublisher(
     }
 
     fun stop() {
+        cancelJobs()
+        scope.launch {
+            disposePeerConnectionAsync()
+        }
+    }
+
+    /**
+     * Like [stop], but returns only once the PeerConnection is disposed. Use it before
+     * disposing the PeerConnectionFactory: a factory disposed under a live connection
+     * leaves WebRTC's network monitor pointing at freed memory, and the next network
+     * change crashes the app (SIGSEGV in NetworkMonitor.nativeNotifyOfNetworkConnect).
+     */
+    suspend fun stopAndDispose() {
+        cancelJobs()
+        disposePeerConnectionAsync()
+    }
+
+    private fun cancelJobs() {
+        stopped = true
         collectJob?.cancel()
         collectJob = null
         announceJob?.cancel()
         announceJob = null
         stopLinkWatch()
-        scope.launch {
-            disposePeerConnectionAsync()
-        }
     }
 
     private fun handleSignaling(text: String) {
@@ -164,6 +182,8 @@ class WebRtcPublisher(
     }
 
     private fun buildAndSendOffer() {
+        // An offer already queued when the publisher stopped must not open a new connection.
+        if (stopped) return
         // STUN/TURN from the signaling room (STUN only on LAN-only joins). Host candidates
         // stay, so a phone on the same Wi-Fi still gets the direct LAN path.
         val iceServers = PhoneIceServers.current().map { server ->
@@ -283,6 +303,7 @@ class WebRtcPublisher(
     }
 
     private fun reportLink(stats: Map<String, RTCStats>) {
+        reportVideo(stats)
         val selectedId = stats.values
             .firstOrNull { it.type == "transport" }
             ?.members?.get("selectedCandidatePairId") as? String
@@ -302,6 +323,31 @@ class WebRtcPublisher(
         if (CastLinkMonitor.update(type)) Log.i(TAG, "Cast link: ${type.label}")
     }
 
+    /** Diagnostics: what the encoder actually sends, and what (if anything) holds it back. */
+    private fun reportVideo(stats: Map<String, RTCStats>) {
+        val video = stats.values.firstOrNull { it.type == "outbound-rtp" && it.members["kind"] == "video" } ?: return
+        val m = video.members
+        val available = stats.values
+            .firstOrNull { it.type == "candidate-pair" && it.members["nominated"] == true && it.members["state"] == "succeeded" }
+            ?.members?.get("availableOutgoingBitrate") as? Number
+        val codec = (m["codecId"] as? String)?.let { stats[it] }
+            ?.members?.get("mimeType") as? String
+        if (codec != null) {
+            val used = codecName(codec)
+            val wanted = quality.preferredCodec.name
+            val fallback = if (used == wanted) null else CastLinkMonitor.CodecFallback(wanted, used)
+            if (CastLinkMonitor.updateCodec(fallback)) Log.i(TAG, "Codec: chose $wanted, sending $used")
+        }
+        Log.i(
+            TAG,
+            "Video out: ${codec?.let(::codecName) ?: "?"} ${(m["framesPerSecond"] as? Number)?.toInt() ?: 0} fps " +
+                "${m["frameWidth"]}x${m["frameHeight"]}, " +
+                "limit=${m["qualityLimitationReason"]}, encoder=${m["encoderImplementation"]}, " +
+                "target=${((m["targetBitrate"] as? Number)?.toLong() ?: 0) / 1000} kbps, " +
+                "available=${(available?.toLong() ?: 0) / 1000} kbps",
+        )
+    }
+
     /** Put the preferred codec first in the offer so the hardware encoder is used. */
     private fun applyCodecPreference(pc: PeerConnection) {
         val wanted = quality.preferredCodec.name // matches SDP names: H264, H265, VP8, VP9, AV1
@@ -311,10 +357,10 @@ class WebRtcPublisher(
             )
             val codecs = capabilities.codecs
             if (codecs.none { it.name.equals(wanted, ignoreCase = true) }) {
-                Log.w(TAG, "Codec $wanted not in sender capabilities — keeping defaults")
-                return
+                Log.w(TAG, "Codec $wanted not in sender capabilities — preferring $FALLBACK_CODEC")
             }
-            val ordered = codecs.sortedByDescending { it.name.equals(wanted, ignoreCase = true) }
+            // H.264 second: if the PC can't play the chosen codec it still gets a hardware one, not software VP8.
+            val ordered = codecs.sortedBy { codecRank(it.name, wanted) }
             val transceiver = pc.transceivers.firstOrNull {
                 it.sender.track()?.id() == videoTrack.id()
             }
@@ -379,6 +425,19 @@ class WebRtcPublisher(
     companion object {
         private const val TAG = "WebRtcPublisher"
         private const val LINK_POLL_MS = 5_000L
+        /** Every PC viewer decodes it, and phones encode it in hardware. */
+        const val FALLBACK_CODEC = "H264"
+
+        /** Offer order: the chosen codec, then H.264, then the rest as the factory listed them. */
+        fun codecRank(name: String, wanted: String): Int = when {
+            name.equals(wanted, ignoreCase = true) -> 0
+            name.equals(FALLBACK_CODEC, ignoreCase = true) -> 1
+            else -> 2
+        }
+
+        /** "video/H264" → "H264". */
+        fun codecName(mimeType: String): String = mimeType.substringAfter('/').uppercase()
+
         /** Stereo music bitrate — WebRTC voice defaults are far lower. */
         private const val OPUS_MAX_AVERAGE_BITRATE_BPS = 256_000
 

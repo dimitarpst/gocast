@@ -9,9 +9,12 @@ import android.Manifest
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import app.gocast.R
 import app.gocast.network.CastConnection
+import app.gocast.network.CastLinkMonitor
 import app.gocast.network.SignalingBridge
 import app.gocast.settings.CastQualityDiff
 import app.gocast.settings.CastQualitySettings
@@ -24,7 +27,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 class CaptureService : Service() {
@@ -101,6 +106,17 @@ class CaptureService : Service() {
         // Keep / restore phone↔PC signaling for the lifetime of this service
         // (including paused), independent of Activity / ViewModel.
         CastConnection.ensureConnected()
+        // A toast reaches the user while they cast another app; the panel shows only inside gocast.
+        serviceScope.launch {
+            CastLinkMonitor.codecFallback.filterNotNull().collect { fallback ->
+                val text = getString(
+                    R.string.codec_fallback,
+                    CastLinkMonitor.codecLabel(fallback.wanted),
+                    CastLinkMonitor.codecLabel(fallback.used),
+                )
+                Toast.makeText(applicationContext, text, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -185,11 +201,12 @@ class CaptureService : Service() {
         }
     }
 
-    private fun rebuildMediaKeepingProjection(next: CastQualitySettings) {
+    private suspend fun rebuildMediaKeepingProjection(next: CastQualitySettings) {
         val session = screenCast ?: return
         val oldPub = publisher
         publisher = null
-        oldPub?.stop()
+        // The rebuild disposes the factory; its connection must be gone first.
+        oldPub?.stopAndDispose()
 
         val ok = session.rebuildKeepingProjection(next)
         if (!ok) {
@@ -300,7 +317,8 @@ class CaptureService : Service() {
     override fun onDestroy() {
         paused = false
         setMediaActive(applicationContext, active = false, paused = false)
-        publisher?.stop()
+        // Blocks briefly: the connection must be disposed before the session disposes the factory.
+        runBlocking { publisher?.stopAndDispose() }
         screenCast?.stop(projectionAlreadyStopped = true)
         publisher = null
         screenCast = null
@@ -335,7 +353,7 @@ class CaptureService : Service() {
         }
         releaseCastWakeLock()
 
-        pub?.stop()
+        pub?.stopAndDispose()
         withContext(Dispatchers.Default) {
             session?.stop(projectionAlreadyStopped = projectionAlreadyStopped)
         }
