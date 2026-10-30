@@ -15,12 +15,14 @@ import app.gocast.protocol.JoinParams
 import app.gocast.domain.JoinUrlParser
 import app.gocast.domain.TrustedPc
 import app.gocast.network.CastConnection
+import app.gocast.network.GocastBluetoothDiscovery
 import app.gocast.network.GocastDiscovery
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class CastViewModel(application: Application) : AndroidViewModel(application) {
@@ -28,6 +30,7 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
     private val captureGate = CaptureGate()
     private val trustedStore = TrustedPcStore(application)
     private val discovery = GocastDiscovery(application)
+    private val bluetoothDiscovery = GocastBluetoothDiscovery(application)
 
     val connectionState: StateFlow<ConnectionState> = CastConnection.state
     val events: SharedFlow<CastEvent> = captureGate.events
@@ -38,10 +41,16 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
     private val _discoveredHosts = MutableStateFlow<List<DiscoveredHost>>(emptyList())
     val discoveredHosts: StateFlow<List<DiscoveredHost>> = _discoveredHosts.asStateFlow()
 
+    private val _bluetoothHosts = MutableStateFlow<List<DiscoveredHost>>(emptyList())
+    val bluetoothHosts: StateFlow<List<DiscoveredHost>> = _bluetoothHosts.asStateFlow()
+
+    val bluetoothSupported: Boolean = bluetoothDiscovery.isSupported()
+
     private val _joinBusy = MutableStateFlow(false)
     val joinBusy: StateFlow<Boolean> = _joinBusy.asStateFlow()
 
     private var discoveryJob: Job? = null
+    private var bluetoothJob: Job? = null
     private var castTrustedJob: Job? = null
 
     init {
@@ -129,6 +138,24 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
         _discoveredHosts.value = emptyList()
     }
 
+    fun isBluetoothOn(): Boolean = bluetoothDiscovery.isEnabled()
+
+    /** Caller must hold the scan permission. Stops by itself if Bluetooth is off. */
+    fun startBluetoothDiscovery() {
+        if (bluetoothJob?.isActive == true) return
+        bluetoothJob = viewModelScope.launch {
+            bluetoothDiscovery.discover()
+                .catch { _bluetoothHosts.value = emptyList() }
+                .collect { hosts -> _bluetoothHosts.value = hosts }
+        }
+    }
+
+    fun stopBluetoothDiscovery() {
+        bluetoothJob?.cancel()
+        bluetoothJob = null
+        _bluetoothHosts.value = emptyList()
+    }
+
     fun onResumeCastRequested() {
         CastConnection.ensureConnected()
         viewModelScope.launch {
@@ -170,5 +197,6 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         stopDiscovery()
+        stopBluetoothDiscovery()
     }
 }

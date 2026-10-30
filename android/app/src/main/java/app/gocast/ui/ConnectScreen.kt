@@ -1,9 +1,11 @@
 package app.gocast.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -70,14 +72,24 @@ import app.gocast.ui.components.LastConnectedCard
 import app.gocast.ui.components.PAIRING_CODE_LENGTH
 import app.gocast.ui.components.PairingCodeInput
 import app.gocast.ui.quality.QualitySettingsScreen
+import kotlinx.coroutines.awaitCancellation
 
 private enum class ConnectMode {
     Home,
     Scan,
     Discover,
+    BluetoothDiscover,
     EnterCode,
     Quality,
 }
+
+/** Android 12+ asks for "Nearby devices"; 10–11 can only scan with location. */
+private val bluetoothScanPermissions: Array<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        arrayOf(Manifest.permission.BLUETOOTH_SCAN)
+    } else {
+        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
 
 @Composable
 fun ConnectScreen(
@@ -91,13 +103,28 @@ fun ConnectScreen(
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val trustedPc by viewModel.trustedPc.collectAsStateWithLifecycle()
     val discoveredHosts by viewModel.discoveredHosts.collectAsStateWithLifecycle()
+    val bluetoothHosts by viewModel.bluetoothHosts.collectAsStateWithLifecycle()
     val joinBusy by viewModel.joinBusy.collectAsStateWithLifecycle()
     val castUiState by CaptureService.castUiState.collectAsStateWithLifecycle()
     var mode by remember {
         mutableStateOf(if (startWithQualitySettings) ConnectMode.Quality else ConnectMode.Home)
     }
     var selectedHost by remember { mutableStateOf<DiscoveredHost?>(null) }
+    // Which list Enter code returns to.
+    var hostListMode by remember { mutableStateOf(ConnectMode.Discover) }
+    var bluetoothOn by remember { mutableStateOf(true) }
     var codeInput by remember { mutableStateOf("") }
+
+    val bluetoothDeniedMessage = stringResource(R.string.bluetooth_permission_denied)
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { results ->
+        if (results.values.all { it }) {
+            mode = ConnectMode.BluetoothDiscover
+        } else {
+            Toast.makeText(context, bluetoothDeniedMessage, Toast.LENGTH_LONG).show()
+        }
+    }
 
     val captureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -162,7 +189,10 @@ fun ConnectScreen(
         val window = (context as? android.app.Activity)?.window ?: return@LaunchedEffect
         if (connectionState is ConnectionState.Connected) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            if (mode == ConnectMode.Discover || mode == ConnectMode.EnterCode) {
+            if (mode == ConnectMode.Discover ||
+                mode == ConnectMode.BluetoothDiscover ||
+                mode == ConnectMode.EnterCode
+            ) {
                 mode = ConnectMode.Home
                 viewModel.stopDiscovery()
             }
@@ -171,22 +201,35 @@ fun ConnectScreen(
         }
     }
 
-    LaunchedEffect(mode, trustedPc?.instanceId) {
+    LaunchedEffect(mode) {
         when (mode) {
-            ConnectMode.Discover -> viewModel.startDiscovery()
-            // Keep listening on Home so Last connected can light up when the PC appears.
-            ConnectMode.Home -> {
-                if (trustedPc != null) {
-                    viewModel.startDiscovery()
-                } else {
-                    viewModel.stopDiscovery()
-                }
-            }
+            // Keep listening on Home so Last connected can light up and
+            // Find on Wi-Fi can show how many PCs are already there.
+            ConnectMode.Home,
+            ConnectMode.Discover,
+            -> viewModel.startDiscovery()
             // Scanning leaves Home's discovery as it was, like the old scanner activity did.
             ConnectMode.Scan,
+            ConnectMode.BluetoothDiscover,
             ConnectMode.EnterCode,
             -> Unit
             ConnectMode.Quality -> viewModel.stopDiscovery()
+        }
+    }
+
+    // Scan only while the Bluetooth list is on screen; re-check on return
+    // from Settings in case the user just switched Bluetooth on.
+    LaunchedEffect(mode, lifecycleOwner) {
+        if (mode != ConnectMode.BluetoothDiscover) return@LaunchedEffect
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            bluetoothOn = viewModel.isBluetoothOn()
+            if (!bluetoothOn) return@repeatOnLifecycle
+            viewModel.startBluetoothDiscovery()
+            try {
+                awaitCancellation()
+            } finally {
+                viewModel.stopBluetoothDiscovery()
+            }
         }
     }
 
@@ -194,6 +237,7 @@ fun ConnectScreen(
         when (mode) {
             ConnectMode.Quality,
             ConnectMode.Scan,
+            ConnectMode.BluetoothDiscover,
             -> mode = ConnectMode.Home
             ConnectMode.Discover,
             ConnectMode.EnterCode,
@@ -245,6 +289,7 @@ fun ConnectScreen(
             onHostClick = { host ->
                 selectedHost = host
                 codeInput = ""
+                hostListMode = ConnectMode.Discover
                 mode = ConnectMode.EnterCode
             },
             onScanQr = { mode = ConnectMode.Scan },
@@ -252,6 +297,25 @@ fun ConnectScreen(
                 viewModel.stopDiscovery()
                 mode = ConnectMode.Home
             },
+        )
+        return
+    }
+
+    if (mode == ConnectMode.BluetoothDiscover) {
+        FindWithBluetoothScreen(
+            hosts = bluetoothHosts,
+            bluetoothOn = bluetoothOn,
+            onTurnOnBluetooth = {
+                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            },
+            onHostClick = { host ->
+                selectedHost = host
+                codeInput = ""
+                hostListMode = ConnectMode.BluetoothDiscover
+                mode = ConnectMode.EnterCode
+            },
+            onScanQr = { mode = ConnectMode.Scan },
+            onBack = { mode = ConnectMode.Home },
         )
         return
     }
@@ -289,7 +353,7 @@ fun ConnectScreen(
             },
             onBack = {
                 codeInput = ""
-                mode = ConnectMode.Discover
+                mode = hostListMode
             },
         )
         return
@@ -329,7 +393,23 @@ fun ConnectScreen(
                         ).show()
                     },
                     onScanQr = { mode = ConnectMode.Scan },
+                    wifiHostCount = discoveredHosts.size,
                     onFindWifi = { mode = ConnectMode.Discover },
+                    onFindBluetooth = if (viewModel.bluetoothSupported) {
+                        {
+                            val missing = bluetoothScanPermissions.filter {
+                                ContextCompat.checkSelfPermission(context, it) !=
+                                    PackageManager.PERMISSION_GRANTED
+                            }
+                            if (missing.isEmpty()) {
+                                mode = ConnectMode.BluetoothDiscover
+                            } else {
+                                bluetoothPermissionLauncher.launch(missing.toTypedArray())
+                            }
+                        }
+                    } else {
+                        null
+                    },
                     onResume = { viewModel.onResumeCastRequested() },
                     onStop = { viewModel.stopCast() },
                     onQuality = { mode = ConnectMode.Quality },
@@ -338,6 +418,7 @@ fun ConnectScreen(
             }
 
             ConnectMode.Discover,
+            ConnectMode.BluetoothDiscover,
             ConnectMode.EnterCode,
             ConnectMode.Quality,
             ConnectMode.Scan,
@@ -359,7 +440,10 @@ private fun HomeContent(
     onCastTrusted: () -> Unit,
     onTrustedOffline: () -> Unit,
     onScanQr: () -> Unit,
+    wifiHostCount: Int,
     onFindWifi: () -> Unit,
+    /** Null when the phone has no Bluetooth LE. */
+    onFindBluetooth: (() -> Unit)?,
     onResume: () -> Unit,
     onStop: () -> Unit,
     onQuality: () -> Unit,
@@ -461,7 +545,18 @@ private fun HomeContent(
                 symbol = ConnectionActionSymbol.Wifi,
                 prominent = false,
                 onClick = onFindWifi,
+                badgeCount = wifiHostCount,
             )
+            if (onFindBluetooth != null) {
+                Spacer(Modifier.height(12.dp))
+                ConnectionActionCard(
+                    title = stringResource(R.string.find_with_bluetooth),
+                    subtitle = stringResource(R.string.find_bluetooth_description),
+                    symbol = ConnectionActionSymbol.Bluetooth,
+                    prominent = false,
+                    onClick = onFindBluetooth,
+                )
+            }
             Spacer(Modifier.height(20.dp))
         }
 

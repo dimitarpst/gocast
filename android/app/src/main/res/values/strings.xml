@@ -34,6 +34,14 @@
     <string name="looking_for_pcs">Looking for PCs…</string>
     <string name="no_pcs_yet">No PCs yet. Is GoCast open on your PC?</string>
     <string name="wifi_pcs_heading">On this Wi-Fi</string>
+    <string name="find_with_bluetooth">Find with Bluetooth</string>
+    <string name="find_bluetooth_description">Find a PC near you, on any network</string>
+    <string name="looking_for_pcs_bluetooth">Looking for PCs nearby…</string>
+    <string name="no_pcs_bluetooth">No PCs nearby yet. Is GoCast open on your PC, with Bluetooth on?</string>
+    <string name="bluetooth_pcs_heading">Nearby</string>
+    <string name="bluetooth_off">Bluetooth is off on this phone.</string>
+    <string name="bluetooth_turn_on">Turn on Bluetooth</string>
+    <string name="bluetooth_permission_denied">Allow Nearby devices to find PCs with Bluetooth</string>
     <string name="back">Back</string>
     <string name="enter_code">Enter code</string>
     <string name="enter_code_hint">Shown in GoCast on your PC</string>

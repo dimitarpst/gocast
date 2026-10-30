@@ -53,6 +53,7 @@ import app.gocast.ui.components.PAIRING_CODE_LENGTH
 import app.gocast.ui.components.PairingCodeInput
 import app.gocast.ui.components.ScreenTopBar
 import app.gocast.ui.components.SettingsGroup
+import app.gocast.ui.components.drawBluetoothSymbol
 import app.gocast.ui.components.drawWifiSymbol
 import kotlin.math.PI
 import kotlin.math.sin
@@ -65,6 +66,61 @@ fun FindOnWifiScreen(
     onHostClick: (DiscoveredHost) -> Unit,
     onScanQr: () -> Unit,
     onBack: () -> Unit,
+) {
+    FindPcsScreen(
+        title = stringResource(R.string.find_on_wifi),
+        looking = stringResource(R.string.looking_for_pcs),
+        nothingYet = stringResource(R.string.no_pcs_yet),
+        heading = stringResource(R.string.wifi_pcs_heading),
+        symbol = { SearchingWifi() },
+        hosts = hosts,
+        onHostClick = onHostClick,
+        onScanQr = onScanQr,
+        onBack = onBack,
+    )
+}
+
+/** PCs whose Bluetooth beacon this phone hears, whatever network they are on. */
+@Composable
+fun FindWithBluetoothScreen(
+    hosts: List<DiscoveredHost>,
+    bluetoothOn: Boolean,
+    onTurnOnBluetooth: () -> Unit,
+    onHostClick: (DiscoveredHost) -> Unit,
+    onScanQr: () -> Unit,
+    onBack: () -> Unit,
+) {
+    FindPcsScreen(
+        title = stringResource(R.string.find_with_bluetooth),
+        looking = stringResource(R.string.looking_for_pcs_bluetooth),
+        nothingYet = stringResource(R.string.no_pcs_bluetooth),
+        heading = stringResource(R.string.bluetooth_pcs_heading),
+        symbol = { SearchingBluetooth() },
+        hosts = hosts,
+        onHostClick = onHostClick,
+        onScanQr = onScanQr,
+        onBack = onBack,
+        problem = if (bluetoothOn) null else stringResource(R.string.bluetooth_off),
+        fixLabel = stringResource(R.string.bluetooth_turn_on),
+        onFix = onTurnOnBluetooth,
+    )
+}
+
+/** Shared layout for the PC lists. A [problem] replaces the search with its [onFix] button. */
+@Composable
+private fun FindPcsScreen(
+    title: String,
+    looking: String,
+    nothingYet: String,
+    heading: String,
+    symbol: @Composable () -> Unit,
+    hosts: List<DiscoveredHost>,
+    onHostClick: (DiscoveredHost) -> Unit,
+    onScanQr: () -> Unit,
+    onBack: () -> Unit,
+    problem: String? = null,
+    fixLabel: String = "",
+    onFix: () -> Unit = {},
 ) {
     // After a while with nothing found, point at the likely cause instead of "looking…" forever.
     var waitedLong by remember { mutableStateOf(false) }
@@ -79,23 +135,38 @@ fun FindOnWifiScreen(
             .padding(horizontal = 16.dp)
             .padding(top = 8.dp, bottom = 16.dp),
     ) {
-        ScreenTopBar(title = stringResource(R.string.find_on_wifi), onBack = onBack)
+        ScreenTopBar(title = title, onBack = onBack)
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(32.dp))
-            SearchingWifi()
-            if (hosts.isEmpty()) {
+            symbol()
+            if (problem != null) {
                 Text(
-                    stringResource(if (waitedLong) R.string.no_pcs_yet else R.string.looking_for_pcs),
+                    problem,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 20.dp, start = 16.dp, end = 16.dp),
+                )
+                Button(
+                    onClick = onFix,
+                    shape = CircleShape,
+                    modifier = Modifier.padding(top = 16.dp).heightIn(min = 48.dp),
+                ) {
+                    Text(fixLabel)
+                }
+            } else if (hosts.isEmpty()) {
+                Text(
+                    if (waitedLong) nothingYet else looking,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 20.dp, start = 16.dp, end = 16.dp),
                 )
             } else {
-                SettingsGroup(title = stringResource(R.string.wifi_pcs_heading)) {
+                SettingsGroup(title = heading) {
                     hosts.forEach { host -> HostRow(host, onClick = { onHostClick(host) }) }
                 }
             }
@@ -233,6 +304,28 @@ private fun PcAvatar(name: String, size: Dp) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
         )
+    }
+}
+
+/** The Bluetooth rune breathing in and out while the phone listens for beacons. */
+@Composable
+private fun SearchingBluetooth() {
+    val transition = rememberInfiniteTransition(label = "searching")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1_800, easing = LinearEasing), RepeatMode.Restart),
+        label = "phase",
+    )
+    val color = MaterialTheme.colorScheme.primary
+    Box(
+        Modifier.size(112.dp).background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(56.dp)) {
+            val glow = sin(phase * PI).toFloat()
+            drawBluetoothSymbol(color.copy(alpha = 0.35f + 0.65f * glow))
+        }
     }
 }
 
