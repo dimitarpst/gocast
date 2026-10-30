@@ -68,7 +68,9 @@ try {
     $desktop = Join-Path $workspace 'desktop'
     $task = if ($Release) { ':desktopApp:packageReleaseMsi' } else { ':desktopApp:packageMsi' }
     Push-Location -LiteralPath $desktop
-    try { Invoke-PackageTool (Join-Path $desktop 'gradlew.bat') @($task, '--console=plain') }
+    # Like dev.ps1: the Compose packaging tasks are not configuration-cache safe, and the
+    # cache check fails the build even after the MSI was written.
+    try { Invoke-PackageTool (Join-Path $desktop 'gradlew.bat') @($task, '--console=plain', '--no-configuration-cache') }
     finally { Pop-Location }
 
     $variant = if ($Release) { 'main-release' } else { 'main' }
