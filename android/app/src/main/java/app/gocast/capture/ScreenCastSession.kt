@@ -310,7 +310,7 @@ class ScreenCastSession(
         val scale = quality.resolutionScale.coerceIn(0.1f, 1.0f)
         val w = ((width * scale).toInt() / 2) * 2
         val h = ((height * scale).toInt() / 2) * 2
-        return w to h
+        return EncoderSizeFit.fit(w, h, quality.preferredCodec)
     }
 
     fun stop(projectionAlreadyStopped: Boolean = false) {

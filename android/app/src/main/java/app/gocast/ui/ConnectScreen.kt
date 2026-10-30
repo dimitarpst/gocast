@@ -548,7 +548,7 @@ private fun ActiveCastPanel(
             Spacer(Modifier.height(6.dp))
             Text(
                 text = stringResource(
-                    R.string.codec_fallback,
+                    fallback.messageRes,
                     CastLinkMonitor.codecLabel(fallback.wanted),
                     CastLinkMonitor.codecLabel(fallback.used),
                 ),

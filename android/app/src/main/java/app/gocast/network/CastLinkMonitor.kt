@@ -1,5 +1,7 @@
 package app.gocast.network
 
+import androidx.annotation.StringRes
+import app.gocast.R
 import app.gocast.protocol.LinkType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,8 +12,12 @@ object CastLinkMonitor {
     private val _linkType = MutableStateFlow<LinkType?>(null)
     val linkType: StateFlow<LinkType?> = _linkType.asStateFlow()
 
-    /** The PC can't play the chosen codec, so the cast uses another one. */
-    data class CodecFallback(val wanted: String, val used: String)
+    /** The cast uses another codec than the chosen one, because the PC or this phone can't do it. */
+    data class CodecFallback(val wanted: String, val used: String, val pcPlaysWanted: Boolean) {
+        @get:StringRes
+        val messageRes: Int
+            get() = if (pcPlaysWanted) R.string.codec_fallback_phone else R.string.codec_fallback
+    }
 
     private val _codecFallback = MutableStateFlow<CodecFallback?>(null)
     val codecFallback: StateFlow<CodecFallback?> = _codecFallback.asStateFlow()
