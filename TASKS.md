@@ -8,6 +8,9 @@ This is the persistent working list. Update it when work starts, scope changes, 
 
 - [ ] **DEL-01 — Audit installation and releases.** Local source and GitHub metadata audited; see [findings](research/installation-and-updates.md). Confirmed `dimitarpst/gocast`, default branch `master`, and published versions 1.0.0–1.0.2 with APK/MSI assets. Actual MSI tables/behaviour, installation scope, architecture, and signing remain to verify.
 - [ ] **GIT-02 — Release artifacts.** Source checkpoints are saved locally in logical groups. Prepare validated packages and a matching release tag/draft only after DEL-07. Do not publish unvalidated packages.
+  - **31 Oct: v1.0.3 draft release created at the user's request** (target `eece5de`, not yet published). Assets: `gocast-1.0.3.apk` (release build, versionCode 8), `gocast-1.0.3-windows-x64-setup.exe` (unsigned), `SHA256SUMS.txt`. Built on this PC with WiX 3.14 binaries from the official `wixtoolset/wix3` release, unzipped to `%USERPROFILE%\Tools\wix314` (not installed system-wide).
+  - **New Android signing key:** v1.0.0–1.0.2 were signed with another computer's debug key, which is not on this PC, so 1.0.3 has a new permanent release key (cert SHA-256 `67:9B:9E:FA:…:99:E3`) in `%USERPROFILE%\GoCast-release-key` (outside git; back it up). Phones with 1.0.2 must uninstall once before installing 1.0.3; later updates install over it.
+  - Not validated: upgrade from 1.0.0–1.0.2 on Windows, clean install, uninstall (DEL-07). PR #1 is pushed but not merged; merging needs the user.
 - [ ] **DEL-07 — Validate release and maintenance scenarios.** User-run build/compile/tests, clean install, upgrade from actual GitHub releases, same-version repair, downgrade rejection, uninstall, locked files, cancellation, and rollback. This is the current release gate; no builds or installer/device tests have been run by the agent in this pass.
 
 ## Ready / next
