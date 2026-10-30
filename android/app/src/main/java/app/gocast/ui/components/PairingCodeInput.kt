@@ -1,5 +1,6 @@
 package app.gocast.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -106,7 +107,7 @@ fun PairingCodeInput(
                         focusRequester.requestFocus()
                         fieldValue = fieldValue.copy(selection = TextRange(fieldValue.text.length))
                     },
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 repeat(length) { index ->
@@ -115,17 +116,16 @@ fun PairingCodeInput(
                         index == value.length ||
                             (value.length == length && index == length - 1)
                         )
-                    val borderColor = when {
-                        isActive -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
-                    }
+                    // Filled tiles, no outline; only the box being typed into gets an accent ring.
+                    val borderColor = if (isActive) MaterialTheme.colorScheme.primary else Color.Transparent
 
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .width(52.dp)
-                            .height(68.dp)
-                            .border(width = 1.dp, color = borderColor, shape = CodeBoxShape),
+                            .width(60.dp)
+                            .height(72.dp)
+                            .background(MaterialTheme.colorScheme.surfaceContainer, CodeBoxShape)
+                            .border(width = 2.dp, color = borderColor, shape = CodeBoxShape),
                     ) {
                         Text(
                             text = char,

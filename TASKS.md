@@ -44,6 +44,14 @@ This is the persistent working list. Update it when work starts, scope changes, 
   Setting values are unchanged; names are plain (e.g. "Keep it sharp", "Video priority"). "How it works" is one page; fake sharing/quality demos removed. Built and installed with Refresh Phone (build 20261030-034643-028). User looked at the Quality screen on the Poco and approved it (30 Oct). The nav-bar spacing and "How it works" were not separately confirmed, and the Xiaomi 15T Pro was not checked. User check on the phone pending.
 - [ ] **UI-06 — New QR scanner.** Replaced the quickie library with our own CameraX + ML Kit screen (same library versions, nothing new downloaded). The frame springs onto a QR as soon as the camera locates it, even before it is readable (white), reading at 1280×960 instead of the default 640×480. GoCast QR → primary colour and connects; other QR → red frame and "Not a GoCast QR code"; it never connects. Bottom panel in the Quality screen's style has the approved QR symbol, Flashlight and Find on Wi‑Fi. Denied camera → "Allow camera access to scan" + Open settings, per [journey notes](research/onboarding/journey-and-recovery.md). Built and installed with Refresh Phone (build 20261030-040643-634). The user tried the first version and liked it; the early lock-on is not tried yet.
 - [ ] **UI-07 — Hide the connection-type label.** The phone cast screen no longer shows Direct/Relayed, and the PC viewer says just "Casting". Detection and logging are unchanged. Built with Refresh Both (build 20261030-041232-033); user confirmed the label is gone.
+- [ ] **UI-08 — Find on Wi‑Fi and Enter code redesign.** Same style as Quality and the scanner:
+  - shared back-arrow top bar;
+  - the approved Wi‑Fi symbol's bands pulse while searching;
+  - after 8 s with nothing found: "No PCs yet. Is GoCast open on your PC?";
+  - PCs listed as one rounded group with initial avatars, plus a Scan QR pill;
+  - Enter code shows the PC's avatar and name, borderless code tiles, and a pill Connect button that shows "Connecting…" and the failure reason on the same screen.
+
+  Join logic is unchanged. Built and installed with Refresh Phone (build 20261030-050035-488); not yet seen on the phone.
 - [ ] **UI-04 — PC identity header.** Removed the pill and permanent Rename text after user feedback. Name is a compact transparent clickable control; hover/keyboard focus reveals a faded edit icon and subtle surface, with space reserved to prevent movement. Opens the approved modal. Specific pattern research saved in [research/pc-name-editing.md](research/pc-name-editing.md). Refresh PC.cmd rebuilt and relaunched successfully (build 20261025-045230-571). Visual review pending.
 
 ## Completed research / recorded requirements
