@@ -12,6 +12,9 @@
     <util:RegistrySearch Id="WebView2MachineSearch" Root="HKLM"
         Key="SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
         Value="pv" Variable="WebView2MachineVersion" Result="value" Win64="no" />
+    <!-- 5 = installed. Only then is the 1.0.2 repair applied. -->
+    <util:ProductSearch Id="GoCast102Search" ProductCode="$(var.Legacy102ProductCode)"
+        Result="state" Variable="GoCast102State" />
     <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.HyperlinkLicense">
       <bal:WixStandardBootstrapperApplication LicenseUrl=""
           LogoFile="$(var.LogoPath)" ThemeFile="$(var.ThemePath)"
@@ -24,6 +27,16 @@
           DisplayName="Microsoft Edge WebView2 Runtime" InstallCommand="/silent /install"
           DetectCondition="WebView2MachineVersion &gt; v0.0.0.0"
           PerMachine="yes" Permanent="yes" Vital="yes" Cache="yes" />
+      <!-- Published 1.0.2 cannot be removed: its cleanup action names a folder its MSI
+           never defines (error 2727), and Windows runs it during the upgrade below.
+           Applying this repaired copy as a minor update replaces the cached installer
+           first, so the upgrade can remove 1.0.2. See scripts/package-windows.ps1. -->
+      <!-- Name: a minor update must come from a file with the original package name,
+           or Windows cannot resolve its source ("SECREPAIR: Error determining
+           package source type", 31 Oct). -->
+      <MsiPackage Id="GoCast102Repair" SourceFile="$(var.Legacy102RepairPath)" Name="gocast-1.0.2.msi"
+                  DisplayName="GoCast 1.0.2 repair" Visible="no" Vital="yes" Permanent="yes"
+                  InstallCondition="GoCast102State = 5" DisplayInternalUI="no" />
       <!-- Burn caches the payload and owns maintenance/rollback. Hide the child
            MSI entry to avoid two competing Windows maintenance entries. -->
       <MsiPackage Id="GoCastApplication" SourceFile="$(var.MsiPath)"
