@@ -1,6 +1,6 @@
 # GoCast tasks
 
-Updated: 29 October 2026. Owner: Codex unless marked user input or user validation.
+Updated: 30 October 2026. Owner: Codex unless marked user input or user validation.
 
 This is the persistent working list. Update it when work starts, scope changes, or a result is ready. Source changes and user-validated behaviour have separate statuses. Keep individual changes small enough to review and commit.
 
@@ -19,10 +19,12 @@ This is the persistent working list. Update it when work starts, scope changes, 
 - [ ] **UX-01 — Replace onboarding demonstrations with real contextual guidance.** Use the researched smooth overlay and failure-aware journey; no fake success or filler pages. See [research](research/onboarding/README.md). Fake demos removed in UI-05; contextual guidance not started.
 - [ ] **DES-01 — Establish the Go experience.** Consistent visual foundations across GoCast phone/PC and future Go apps. See [design direction](research/go-design-language.md).
 - [ ] **DES-02 — Explore a custom Go font and shared logo construction rules.** Record the two-colour vector direction as an input, not a finished specification.
-- [ ] **NET-01 — Discuss and diagnose phone-to-PC connection failure.** Discussed 29 Oct: the user suspects dorm Wi-Fi client isolation (unconfirmed). Decision: connect across networks through Cloudflare signaling + STUN/TURN; see [plan](research/remote-connection.md). Do not change connection behaviour as part of UI or installer work.
+- [ ] **NET-01 — Discuss and diagnose phone-to-PC connection failure.** Discussed 29 Oct: the user suspects dorm Wi-Fi client isolation (unconfirmed). 30 Oct: the user chose Bluetooth discovery + relay as the primary way to connect (NET-05). A test phone on `Constructor-Guest` could not reach the PC on `Constructor` over LAN (different subnets), so check each device's SSID before assuming isolation. Decision: connect across networks through Cloudflare signaling + STUN/TURN; see [plan](research/remote-connection.md). Do not change connection behaviour as part of UI or installer work.
 - [ ] **NET-04b — Cloudflare deployment (user-run), cross-network test matrix, resilience/budget guard.** Plan steps 6–7. Needs NET-02/03/04 validated first. Setup steps in [cloud/signal/README.md](cloud/signal/README.md).
 
 ## Implemented; user validation pending
+
+- [ ] **NET-05 — Find with Bluetooth → relay (primary way to connect).** PC broadcasts two Bluetooth LE beacons through a hidden Windows PowerShell child: a short one (name + LAN IPv4 + port) and a Bluetooth 5 extended one that adds the relay room. Never the pairing code. Phone: Find with Bluetooth list (Nearby devices permission on tap; scans only while open); a PC found with a room joins through the relay with the usual code, LAN as fallback. Find on Wi-Fi gets a found-PC count badge; Home runs Wi-Fi search for everyone. **Verified 30 Oct:** Xiaomi 22111317PG (Android 14) on `Constructor-Guest` found the PC (on `Constructor`) in about 2 s and cast through the relay (PC log: `Cast link: Relayed`). Installed on a Xiaomi 2506BPN68G (Android 17) for a second test. Wi-Fi badge not seen yet (no PC visible over mDNS on these networks). Test company id `0xFFFF` must change before release. See [note](research/nearby-discovery.md).
 
 - [ ] **NET-02 — Signaling Worker + Durable Object.** `cloud/signal/`: Worker + SQLite Durable Object (hibernation, auto ping/pong, hashed host key, one phone per room, STUN/TURN credentials only for allowlisted rooms, relay kill switch). 26 local Vitest tests pass in the Workers runtime. Not deployed; no account id or secret in the repository.
 - [ ] **NET-03 — Room id + remote signaling in protocol, desktop and Android.** Join link gains `r=`; desktop keeps a room id/host key in `identity.json`, dials out to the Worker and passes ICE servers to the viewer; Android stores the room, tries the Worker first with LAN fallback, uses the ICE servers and reconnects without mDNS. Protocol tests (30) pass from the desktop build; desktop server/trust code and a loopback fake-Worker test pass in a scratch JVM build. The Compose module and the Android app were not compiled (Google Maven unreachable in the agent sandbox). Needs Refresh PC / Refresh Phone builds and device tests.
