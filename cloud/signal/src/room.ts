@@ -161,15 +161,20 @@ export class SignalRoom extends DurableObject<Env> {
 	}
 
 	private acceptPhone(phoneId: string): void {
-		// Accepting a phone replaces any earlier one, as on the LAN path.
+		// Accepting a phone replaces any earlier one, as on the LAN path. Mark the new
+		// phone first: when a phone switches Wi-Fi ↔ mobile data its old socket dies
+		// without closing, and sending to it throws. That used to abort this loop
+		// before the new phone was marked, so the PC's "ok" went nowhere and every
+		// reconnect failed until Cloudflare reaped the dead socket (30 Oct, ~2 min).
+		for (const ws of this.ctx.getWebSockets(phoneTag(phoneId))) {
+			const phone = attachment(ws) as Extract<Attachment, { role: "phone" }>;
+			ws.serializeAttachment({ ...phone, accepted: true } satisfies Attachment);
+		}
 		for (const ws of this.ctx.getWebSockets("phone")) {
 			const phone = attachment(ws) as Extract<Attachment, { role: "phone" }>;
-			if (phone.phoneId === phoneId) {
-				ws.serializeAttachment({ ...phone, accepted: true } satisfies Attachment);
-			} else {
-				if (phone.accepted) ws.send('{"type":"session-ended"}');
-				this.dropPhone(ws, CLOSE_OTHER_PHONE_ACCEPTED, "Another phone was accepted");
-			}
+			if (phone.phoneId === phoneId) continue;
+			if (phone.accepted) sendQuietly(ws, '{"type":"session-ended"}');
+			this.dropPhone(ws, CLOSE_OTHER_PHONE_ACCEPTED, "Another phone was accepted");
 		}
 	}
 
@@ -255,6 +260,15 @@ export class SignalRoom extends DurableObject<Env> {
 
 	private dropPhone(ws: WebSocket, code: number, reason: string): void {
 		const phone = attachment(ws) as Extract<Attachment, { role: "phone" }>;
+		// A dropped phone must never receive the PC's messages again, even while
+		// its dead socket lingers in getWebSockets().
+		if (phone.accepted) {
+			try {
+				ws.serializeAttachment({ ...phone, accepted: false } satisfies Attachment);
+			} catch {
+				// Already gone.
+			}
+		}
 		closeQuietly(ws, code, reason);
 		this.pcSocket()?.send(JSON.stringify({ type: "phone-left", phoneId: phone.phoneId }));
 	}
@@ -262,6 +276,14 @@ export class SignalRoom extends DurableObject<Env> {
 
 function attachment(ws: WebSocket): Attachment {
 	return ws.deserializeAttachment() as Attachment;
+}
+
+function sendQuietly(ws: WebSocket, message: string): void {
+	try {
+		ws.send(message);
+	} catch {
+		// The phone's network died with the socket still listed (Wi-Fi ↔ mobile data).
+	}
 }
 
 function closeQuietly(ws: WebSocket, code: number, reason: string): void {
