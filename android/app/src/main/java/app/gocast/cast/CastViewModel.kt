@@ -156,6 +156,11 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
         _bluetoothHosts.value = emptyList()
     }
 
+    /** Casting looks stuck on the PC: rebuild the link and send fresh video. */
+    fun refreshCast() {
+        CastConnection.refresh()
+    }
+
     fun onResumeCastRequested() {
         CastConnection.ensureConnected()
         viewModelScope.launch {

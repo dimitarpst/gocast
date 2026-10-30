@@ -416,6 +416,7 @@ fun ConnectScreen(
                     },
                     onResume = { viewModel.onResumeCastRequested() },
                     onStop = { viewModel.stopCast() },
+                    onRefresh = { viewModel.refreshCast() },
                     onQuality = { mode = ConnectMode.Quality },
                     onShowWalkthrough = onShowWalkthrough,
                 )
@@ -450,6 +451,7 @@ private fun HomeContent(
     onFindBluetooth: (() -> Unit)?,
     onResume: () -> Unit,
     onStop: () -> Unit,
+    onRefresh: () -> Unit,
     onQuality: () -> Unit,
     onShowWalkthrough: () -> Unit,
 ) {
@@ -480,6 +482,7 @@ private fun HomeContent(
                 reconnecting = connectionState !is ConnectionState.Connected,
                 onResume = onResume,
                 onStop = onStop,
+                onRefresh = onRefresh,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -607,6 +610,7 @@ private fun ActiveCastPanel(
     reconnecting: Boolean,
     onResume: () -> Unit,
     onStop: () -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -722,6 +726,11 @@ private fun ActiveCastPanel(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
+            }
+            Spacer(Modifier.height(8.dp))
+            // For when the PC's picture looks stuck: reconnect and send fresh video.
+            TextButton(onClick = onRefresh, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.refresh_cast))
             }
         }
     }

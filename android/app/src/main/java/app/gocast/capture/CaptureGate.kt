@@ -28,6 +28,13 @@ class CaptureGate {
 
     suspend fun onConnectionState(state: ConnectionState) {
         if (suppressAutoConsent) return
+        // A reconnect during a running cast must not ask again. This gate lives in
+        // the screen's ViewModel, so it forgets when the user reopens the app while
+        // CaptureService keeps casting (seen 30 Oct as a second yes/no prompt).
+        if (CaptureService.castUiState.value != CaptureService.CastUiState.Idle) {
+            captureRequested = true
+            return
+        }
         if (state is ConnectionState.Connected && !captureRequested) {
             captureRequested = true
             emitConsentOnce()

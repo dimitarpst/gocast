@@ -128,6 +128,9 @@ class RemoteSignalingClient(
             for (frame in session.incoming) {
                 if (frame is Frame.Text) handle(session, frame.readText())
             }
+            // Closed from the far side with no error (seen 30 Oct); say why, to diagnose drops.
+            val reason = withTimeoutOrNull(1_000) { session.closeReason.await() }
+            println("Remote signaling closed by the relay: ${reason ?: "no reason given"}")
         } finally {
             pinger.cancel()
         }

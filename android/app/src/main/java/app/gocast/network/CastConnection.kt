@@ -94,6 +94,15 @@ object CastConnection {
         connector.start(params)
     }
 
+    /**
+     * The user's Refresh: rebuild the link to the PC now. Once it is back, the
+     * publisher announces itself and the PC asks for a fresh video offer.
+     */
+    fun refresh() {
+        val params = lastParams ?: return
+        connector.start(params, resuming = true)
+    }
+
     /** Reconnect if we still have join params but the socket dropped. */
     fun ensureConnected() {
         val params = lastParams ?: return
