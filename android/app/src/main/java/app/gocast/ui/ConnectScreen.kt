@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -475,6 +477,7 @@ private fun HomeContent(
             ActiveCastPanel(
                 displayName = trustedPc?.displayName,
                 paused = castPaused,
+                reconnecting = connectionState !is ConnectionState.Connected,
                 onResume = onResume,
                 onStop = onStop,
                 modifier = Modifier
@@ -492,16 +495,39 @@ private fun HomeContent(
             )
         } else {
             Spacer(Modifier.height(20.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = when (connectionState) {
-                    is ConnectionState.Failed -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurface
-                },
-                textAlign = TextAlign.Center,
-            )
+            // A failed attempt is retried on its own, so show that calmly; the
+            // reason is a small hint, not a red headline.
+            val retrying = connectionState is ConnectionState.Failed ||
+                connectionState is ConnectionState.Reconnecting
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (retrying) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+                Text(
+                    text = if (connectionState is ConnectionState.Failed) {
+                        stringResource(R.string.reaching_pc)
+                    } else {
+                        label
+                    },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (connectionState is ConnectionState.Failed) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = connectionState.reason,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
             if (connectionState is ConnectionState.Idle) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -577,6 +603,8 @@ private fun HomeContent(
 private fun ActiveCastPanel(
     displayName: String?,
     paused: Boolean,
+    /** The link to the PC dropped (e.g. Wi-Fi → mobile data); the cast resumes on its own. */
+    reconnecting: Boolean,
     onResume: () -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
@@ -595,22 +623,34 @@ private fun ActiveCastPanel(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(12.dp))
-        Text(
-            text = if (paused) {
-                stringResource(R.string.cast_paused_title)
-            } else {
-                stringResource(R.string.cast_live_label)
-            },
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = if (paused) {
-                MaterialTheme.colorScheme.tertiary
-            } else {
-                MaterialTheme.colorScheme.primary
-            },
-            textAlign = TextAlign.Center,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
-        )
+        ) {
+            if (reconnecting && !paused) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+            Text(
+                text = when {
+                    paused -> stringResource(R.string.cast_paused_title)
+                    reconnecting -> stringResource(R.string.reconnecting)
+                    else -> stringResource(R.string.cast_live_label)
+                },
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (paused || reconnecting) {
+                    MaterialTheme.colorScheme.tertiary
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+                textAlign = TextAlign.Center,
+            )
+        }
         // The link type (Direct / Relayed) is only logged by WebRtcPublisher, not shown.
         val codecFallback by CastLinkMonitor.codecFallback.collectAsStateWithLifecycle()
         val fallback = codecFallback

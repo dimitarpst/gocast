@@ -28,10 +28,11 @@ class SessionConnector(
 
     private var connectJob: Job? = null
 
-    fun start(params: JoinParams) {
+    /** @param resuming true to show Reconnecting rather than Connecting from the first attempt. */
+    fun start(params: JoinParams, resuming: Boolean = false) {
         stop(clearState = false)
         connectJob = scope.launch {
-            var attempt = 0
+            var attempt = if (resuming) 1 else 0
             while (isActive) {
                 _state.value = if (attempt == 0) {
                     ConnectionState.Connecting
@@ -61,7 +62,7 @@ class SessionConnector(
                         attempt++
                     }
                     is HelloResult.Failed -> {
-                        session.close()
+                        runCatching { session.close() }
                         _state.value = ConnectionState.Failed(result.reason)
                         delay(reconnectPolicy.delayMsForAttempt(attempt))
                         attempt++
@@ -74,7 +75,8 @@ class SessionConnector(
     fun stop(clearState: Boolean = true) {
         connectJob?.cancel()
         connectJob = null
-        scope.launch { session.close() }
+        // Closing a socket the network already killed can throw; that must not crash the app.
+        scope.launch { runCatching { session.close() } }
         if (clearState) {
             _state.value = ConnectionState.Idle
         }

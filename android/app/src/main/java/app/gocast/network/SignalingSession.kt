@@ -14,6 +14,7 @@ import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -25,6 +26,8 @@ class SignalingSession(
     private val httpClient: HttpClient = GocastHttpClient.instance,
     private val json: Json = Json { ignoreUnknownKeys = true },
     private val remoteBaseUrl: String = RemoteSignaling.BASE_URL,
+    /** False on mobile data: the LAN fallback after the relay cannot answer there. */
+    private val canTryLan: () -> Boolean = { true },
 ) {
     enum class Transport { Remote, Lan }
 
@@ -53,7 +56,13 @@ class SignalingSession(
             when (val remote = openRemote(roomId, params.token)) {
                 is RemoteAttempt.Ok -> return remote.result
                 RemoteAttempt.Rejected -> return HelloResult.Failed(WRONG_CODE)
-                RemoteAttempt.Unavailable -> Log.i(TAG, "Remote signaling unavailable, trying Wi-Fi")
+                RemoteAttempt.Unavailable -> {
+                    if (!canTryLan()) {
+                        Log.i(TAG, "Remote signaling unavailable; not on Wi-Fi, so no LAN fallback")
+                        return HelloResult.Failed(PC_UNREACHABLE)
+                    }
+                    Log.i(TAG, "Remote signaling unavailable, trying Wi-Fi")
+                }
             }
         }
         return openLan(params.host, params.port, params.token, triedRemote)
@@ -202,8 +211,14 @@ class SignalingSession(
                     iceRefresh?.cancel()
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Switching Wi-Fi ↔ mobile data kills the socket mid-read ("Software caused
+            // connection abort"). That is a drop to reconnect from, not a crash.
+            Log.i(TAG, "Signaling socket dropped: ${e.message ?: e.javaClass.simpleName}")
         } finally {
-            close()
+            runCatching { close() }
         }
         return endedByServer
     }
@@ -238,6 +253,7 @@ class SignalingSession(
     private companion object {
         const val TAG = "SignalingSession"
         const val WRONG_CODE = "Wrong code or QR — open gocast on the PC and try again."
+        const val PC_UNREACHABLE = "Can't reach your PC. Is GoCast open on it?"
         const val PING_INTERVAL_MS = 30_000L
         const val ICE_REFRESH_MS = 3 * 60 * 60 * 1000L
     }
