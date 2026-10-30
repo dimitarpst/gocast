@@ -1,5 +1,6 @@
 package app.gocast.network
 
+import android.os.SystemClock
 import android.util.Log
 import app.gocast.protocol.HelloMessage
 import app.gocast.protocol.HelloOkMessage
@@ -78,20 +79,30 @@ class SignalingSession(
 
     private suspend fun openRemote(roomId: String, token: String): RemoteAttempt {
         val url = RemoteSignaling.roomUrl(roomId, RemoteSignaling.ROLE_PHONE, remoteBaseUrl)
+        val started = SystemClock.elapsedRealtime()
         val ws = try {
             // HTTP 503 (PC offline) surfaces as a handshake exception here.
-            withTimeoutOrNull(8_000) { httpClient.webSocketSession(url) }
+            withTimeoutOrNull(REMOTE_HANDSHAKE_MS) { httpClient.webSocketSession(url) }.also {
+                if (it == null) Log.i(TAG, "Relay: no connection after $REMOTE_HANDSHAKE_MS ms")
+            }
         } catch (e: Exception) {
             Log.i(TAG, "Remote signaling: ${e.message ?: e.javaClass.simpleName}")
             null
         } ?: return RemoteAttempt.Unavailable
+        Log.i(TAG, "Relay: connected in ${SystemClock.elapsedRealtime() - started} ms")
         session = ws
         transport = Transport.Remote
         return try {
             ws.send(Frame.Text(helloJson(token)))
+            val sent = SystemClock.elapsedRealtime()
             val text = withTimeoutOrNull(8_000) { receiveText(ws) }
             if (text == null) {
                 val reason = withTimeoutOrNull(500) { ws.closeReason.await() }
+                Log.i(
+                    TAG,
+                    "Relay: no reply to hello after ${SystemClock.elapsedRealtime() - sent} ms" +
+                        (reason?.let { " (closed ${it.code}: ${it.message})" } ?: ""),
+                )
                 close()
                 if (reason?.code == RemoteSignaling.CLOSE_REJECTED) RemoteAttempt.Rejected else RemoteAttempt.Unavailable
             } else {
@@ -254,6 +265,7 @@ class SignalingSession(
         const val TAG = "SignalingSession"
         const val WRONG_CODE = "Wrong code or QR — open gocast on the PC and try again."
         const val PC_UNREACHABLE = "Can't reach your PC. Is GoCast open on it?"
+        const val REMOTE_HANDSHAKE_MS = 12_000L
         const val PING_INTERVAL_MS = 30_000L
         const val ICE_REFRESH_MS = 3 * 60 * 60 * 1000L
     }

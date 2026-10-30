@@ -11,6 +11,9 @@ object GocastHttpClient{
         engine {
             preconfigured = OkHttpClient.Builder()
                 .pingInterval(15, TimeUnit.SECONDS)
+                // Give up on a stalled address (e.g. IPv6 on some mobile networks) soon
+                // enough for OkHttp to try the next one within one join attempt.
+                .connectTimeout(4, TimeUnit.SECONDS)
                 .build()
         }
         install(WebSockets)
