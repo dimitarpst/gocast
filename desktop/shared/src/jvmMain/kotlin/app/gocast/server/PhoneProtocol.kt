@@ -31,6 +31,11 @@ class PhoneProtocol(private val identityStore: DesktopIdentityStore) {
     /** A message from the connected phone after its hello. */
     suspend fun onPhoneMessage(text: String) {
         val type = signalingType(text)
+        if (type == "cast-stopped") {
+            // Stop on the phone: clear the screen now. A plain disconnect keeps it (see clearPhone).
+            SignalingHub.endCast()
+            return
+        }
         if (type == "phone-media-ready") {
             // After MediaProjection accept — not mere WS/QR connect.
             SignalingHub.markCastingActive()

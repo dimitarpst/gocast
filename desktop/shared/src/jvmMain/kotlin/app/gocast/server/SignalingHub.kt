@@ -38,12 +38,22 @@ object SignalingHub {
         viewer = session
     }
 
+    /**
+     * The phone's link closed. Mid-cast that is a connection loss (Wi-Fi ↔ mobile
+     * data, relay hiccup): keep the cast screen and its last frame up while the
+     * phone reconnects. Only [endCast] or [disconnectPhone] clear it.
+     */
     suspend fun clearPhone(link: PhoneLink) = mutex.withLock {
         if (phone === link) {
             phone = null
-            _phoneConnected.value = false
-            _castingActive.value = false
+            if (!_castingActive.value) _phoneConnected.value = false
         }
+    }
+
+    /** The phone said it stopped on purpose ("cast-stopped"): clear the screen now. */
+    suspend fun endCast() = mutex.withLock {
+        _phoneConnected.value = false
+        _castingActive.value = false
     }
 
     /** Kick the phone and mark disconnected (PC-side Disconnect). */

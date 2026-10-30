@@ -456,6 +456,10 @@ private fun HomeContent(
     onShowWalkthrough: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
+    // Connecting, or retrying after a failure (the connector keeps trying until stopped).
+    val trying = connectionState is ConnectionState.Connecting ||
+        connectionState is ConnectionState.Reconnecting ||
+        connectionState is ConnectionState.Failed
     Column(
         modifier = if (isActiveCast) {
             Modifier.fillMaxSize()
@@ -500,13 +504,11 @@ private fun HomeContent(
             Spacer(Modifier.height(20.dp))
             // A failed attempt is retried on its own, so show that calmly; the
             // reason is a small hint, not a red headline.
-            val retrying = connectionState is ConnectionState.Failed ||
-                connectionState is ConnectionState.Reconnecting
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (retrying) {
+                if (trying) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 }
                 Text(
@@ -543,7 +545,26 @@ private fun HomeContent(
             Spacer(Modifier.height(28.dp))
         }
 
-        if (canJoin) {
+        if (trying && !isActiveCast) {
+            // While it connects, the only useful action is to stop trying.
+            OutlinedButton(
+                onClick = onStop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.cancel_connecting),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+        }
+
+        // Other ways to connect only when nothing is under way; mid-cast they
+        // squeezed the casting panel (30 Oct screenshot).
+        if (connectionState is ConnectionState.Idle && !isActiveCast) {
             trustedPc?.let { pc ->
                 LastConnectedCard(
                     pc = pc,

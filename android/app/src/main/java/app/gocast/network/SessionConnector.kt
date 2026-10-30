@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 class SessionConnector(
     private val scope: CoroutineScope,
@@ -76,14 +77,30 @@ class SessionConnector(
         }
     }
 
-    fun stop(clearState: Boolean = true) {
-        connectJob?.cancel()
+    /**
+     * @param endCast the user stopped on purpose: tell the PC first, so it clears
+     *   its screen now. Without it the PC keeps the last frame and waits for us.
+     */
+    fun stop(clearState: Boolean = true, endCast: Boolean = false) {
+        val job = connectJob
         connectJob = null
-        // Closing a socket the network already killed can throw; that must not crash the app.
-        scope.launch { runCatching { session.close() } }
+        if (!endCast) job?.cancel()
+        scope.launch {
+            if (endCast) {
+                runCatching { withTimeoutOrNull(STOP_NOTICE_MS) { session.sendNow(CAST_STOPPED) } }
+                job?.cancel()
+            }
+            // Closing a socket the network already killed can throw; that must not crash the app.
+            runCatching { session.close() }
+        }
         if (clearState) {
             _state.value = ConnectionState.Idle
         }
+    }
+
+    private companion object {
+        const val CAST_STOPPED = """{"type":"cast-stopped"}"""
+        const val STOP_NOTICE_MS = 1_000L
     }
 }
 

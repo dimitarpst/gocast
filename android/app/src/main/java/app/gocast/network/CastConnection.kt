@@ -59,27 +59,36 @@ object CastConnection {
     fun bindAppContext(context: Context) {
         appContext = context.applicationContext
         if (networkWatch == null) {
-            networkWatch = NetworkWatch(context.applicationContext) {
-                scope.launch { onNetworkSwitched() }
-            }
+            networkWatch = NetworkWatch(
+                context.applicationContext,
+                onSwitched = { scope.launch { reconnectSoon(networkSwitched = true) } },
+                onInternetBack = { scope.launch { reconnectSoon(networkSwitched = false) } },
+            )
         }
     }
 
+    @Volatile
+    private var pendingSwitch = false
+
     /**
-     * The phone changed network: the old socket and media path are dead, so
-     * reconnect now instead of after the ping timeout and back-off.
+     * The phone changed network (the old socket and media path are dead), or the
+     * new one just got working internet: reconnect now instead of after the ping
+     * timeout and back-off. Internet coming back leaves a working link alone.
      */
-    private suspend fun onNetworkSwitched() {
+    private fun reconnectSoon(networkSwitched: Boolean) {
+        pendingSwitch = pendingSwitch || networkSwitched
         switchJob?.cancel()
         switchJob = scope.launch {
             // Let the new network settle (Wi-Fi off reports a few changes at once).
             delay(NETWORK_SETTLE_MS)
+            val switched = pendingSwitch
+            pendingSwitch = false
             val params = lastParams ?: return@launch
             when (connector.state.value) {
                 is ConnectionState.Idle,
                 is ConnectionState.Connecting,
                 -> Unit
-                is ConnectionState.Connected,
+                is ConnectionState.Connected -> if (switched) connector.start(params, resuming = true)
                 is ConnectionState.Reconnecting,
                 is ConnectionState.Failed,
                 -> connector.start(params, resuming = true)
@@ -115,8 +124,9 @@ object CastConnection {
         }
     }
 
+    /** A deliberate stop (Stop button, notification, Quick Settings): the PC clears its screen. */
     fun stop() {
         lastParams = null
-        connector.stop()
+        connector.stop(endCast = true)
     }
 }
