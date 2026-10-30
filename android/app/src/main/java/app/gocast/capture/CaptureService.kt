@@ -110,7 +110,7 @@ class CaptureService : Service() {
         serviceScope.launch {
             CastLinkMonitor.codecFallback.filterNotNull().collect { fallback ->
                 val text = getString(
-                    R.string.codec_fallback,
+                    fallback.messageRes,
                     CastLinkMonitor.codecLabel(fallback.wanted),
                     CastLinkMonitor.codecLabel(fallback.used),
                 )

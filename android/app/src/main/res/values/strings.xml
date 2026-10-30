@@ -20,6 +20,7 @@
     <string name="link_internet">Direct (internet)</string>
     <string name="link_relayed">Relayed</string>
     <string name="codec_fallback">Your PC can\'t play %1$s, so gocast is using %2$s.</string>
+    <string name="codec_fallback_phone">This phone couldn\'t start %1$s, so gocast is using %2$s.</string>
     <string name="cast_paused_title">Paused</string>
     <string name="cast_paused_body">Your phone stopped sharing. Resume to continue on your PC.</string>
     <string name="resume_cast">Resume</string>

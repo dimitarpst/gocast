@@ -47,6 +47,9 @@ class WebRtcPublisher(
     @Volatile
     private var stopped = false
     private var remoteDescriptionSet = false
+    /** Video codecs the PC's last answer accepted, to tell a PC limit from a phone one. */
+    @Volatile
+    private var pcCodecs: Set<String> = emptySet()
     private val pendingIce = mutableListOf<IceCandidate>()
 
     /**
@@ -128,6 +131,9 @@ class WebRtcPublisher(
             "answer" -> {
                 val sdp = msg.sdp ?: return
                 val pc = peerConnection ?: return
+                val accepted = videoCodecs(sdp)
+                pcCodecs = accepted.map { it.substringBefore('(') }.toSet()
+                Log.i(TAG, "PC accepts video codecs: ${accepted.joinToString()}")
                 pc.setRemoteDescription(
                     object : SdpObserver {
                         override fun onCreateSuccess(desc: SessionDescription?) = Unit
@@ -253,6 +259,7 @@ class WebRtcPublisher(
             object : SdpObserver {
                 override fun onCreateSuccess(desc: SessionDescription?) {
                     if (desc == null) return
+                    Log.i(TAG, "Phone offers video codecs: ${videoCodecs(desc.description).joinToString()}")
                     val offer = SessionDescription(
                         desc.type,
                         preferHighQualityOpus(desc.description),
@@ -335,7 +342,11 @@ class WebRtcPublisher(
         if (codec != null) {
             val used = codecName(codec)
             val wanted = quality.preferredCodec.name
-            val fallback = if (used == wanted) null else CastLinkMonitor.CodecFallback(wanted, used)
+            val fallback = if (used == wanted) {
+                null
+            } else {
+                CastLinkMonitor.CodecFallback(wanted, used, pcPlaysWanted = wanted in pcCodecs)
+            }
             if (CastLinkMonitor.updateCodec(fallback)) Log.i(TAG, "Codec: chose $wanted, sending $used")
         }
         Log.i(
@@ -433,6 +444,17 @@ class WebRtcPublisher(
             name.equals(wanted, ignoreCase = true) -> 0
             name.equals(FALLBACK_CODEC, ignoreCase = true) -> 1
             else -> 2
+        }
+
+        /** Codec names of the video section in SDP order, e.g. ["H264(640c1f)", "VP8"]. */
+        fun videoCodecs(sdp: String): List<String> {
+            val video = sdp.substringAfter("m=video", "").substringBefore("m=audio")
+            val profiles = Regex("""a=fmtp:(\d+) .*profile-level-id=(\w+)""").findAll(video)
+                .associate { it.groupValues[1] to it.groupValues[2] }
+            return Regex("""a=rtpmap:(\d+) ([\w-]+)/90000""").findAll(video)
+                .map { it.groupValues[2] + (profiles[it.groupValues[1]]?.let { p -> "($p)" } ?: "") }
+                .filter { it !in setOf("rtx", "red", "ulpfec", "flexfec-03") }
+                .toList()
         }
 
         /** "video/H264" → "H264". */

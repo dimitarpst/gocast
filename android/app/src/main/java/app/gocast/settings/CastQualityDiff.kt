@@ -11,6 +11,8 @@ object CastQualityDiff {
 
     fun needsCaptureUpdate(old: CastQualitySettings, new: CastQualitySettings): Boolean =
         old.resolutionScale != new.resolutionScale ||
+            // The frame must fit the new codec's hardware encoder.
+            old.preferredCodec != new.preferredCodec ||
             old.captureFps != new.captureFps ||
             old.virtualDisplayDpi != new.virtualDisplayDpi
 
