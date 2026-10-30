@@ -20,13 +20,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -59,7 +57,8 @@ import app.gocast.settings.QualityRecommender
 import app.gocast.settings.SettingHelp
 import app.gocast.ui.quality.components.CostChipRow
 import app.gocast.ui.quality.components.ProfileRow
-import app.gocast.ui.quality.components.SettingsGroup
+import app.gocast.ui.components.ScreenTopBar
+import app.gocast.ui.components.SettingsGroup
 import app.gocast.ui.quality.components.costColor
 import app.gocast.ui.quality.sections.BitrateSettingsSection
 import app.gocast.ui.quality.sections.CaptureSettingsSection
@@ -167,21 +166,7 @@ fun QualitySettingsScreen(
             .padding(horizontal = 16.dp)
             .padding(top = 8.dp, bottom = 32.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.back),
-                )
-            }
-            Text(
-                "Quality",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.weight(1f),
-            )
+        ScreenTopBar(title = "Quality", onBack = onBack) {
             when (autosaveStatus) {
                 AutosaveStatus.Idle -> Unit
                 AutosaveStatus.Saving -> Text(

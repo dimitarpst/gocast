@@ -1,4 +1,4 @@
-package app.gocast.ui.quality.components
+package app.gocast.ui.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope

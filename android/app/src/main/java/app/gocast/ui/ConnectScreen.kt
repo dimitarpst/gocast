@@ -64,7 +64,6 @@ import app.gocast.protocol.JoinParams
 import app.gocast.domain.JoinUrlParser
 import app.gocast.domain.TrustedPc
 import app.gocast.network.CastLinkMonitor
-import app.gocast.ui.components.DiscoveredHostCard
 import app.gocast.ui.components.ConnectionActionCard
 import app.gocast.ui.components.ConnectionActionSymbol
 import app.gocast.ui.components.LastConnectedCard
@@ -240,6 +239,62 @@ fun ConnectScreen(
     val isActiveCast = castUiState == CaptureService.CastUiState.Casting ||
         castUiState == CaptureService.CastUiState.Paused
 
+    if (mode == ConnectMode.Discover) {
+        FindOnWifiScreen(
+            hosts = discoveredHosts,
+            onHostClick = { host ->
+                selectedHost = host
+                codeInput = ""
+                mode = ConnectMode.EnterCode
+            },
+            onScanQr = { mode = ConnectMode.Scan },
+            onBack = {
+                viewModel.stopDiscovery()
+                mode = ConnectMode.Home
+            },
+        )
+        return
+    }
+
+    if (mode == ConnectMode.EnterCode) {
+        EnterCodeScreen(
+            host = selectedHost,
+            codeInput = codeInput,
+            onCodeChange = { raw ->
+                codeInput = raw.uppercase().filter { ch -> ch.isLetterOrDigit() }
+                    .take(PAIRING_CODE_LENGTH)
+            },
+            canJoin = canJoin,
+            connecting = connectionState is ConnectionState.Connecting ||
+                connectionState is ConnectionState.Reconnecting,
+            error = (connectionState as? ConnectionState.Failed)?.reason,
+            onConnect = {
+                val target = selectedHost ?: return@EnterCodeScreen
+                if (codeInput.length < PAIRING_CODE_LENGTH) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.code_too_short),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return@EnterCodeScreen
+                }
+                viewModel.stopDiscovery()
+                viewModel.startJoin(
+                    JoinParams(
+                        host = target.host,
+                        port = target.port,
+                        token = codeInput,
+                    ),
+                )
+            },
+            onBack = {
+                codeInput = ""
+                mode = ConnectMode.Discover
+            },
+        )
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -282,52 +337,8 @@ fun ConnectScreen(
                 )
             }
 
-            ConnectMode.Discover -> DiscoverContent(
-                hosts = discoveredHosts,
-                onHostClick = { host ->
-                    selectedHost = host
-                    codeInput = ""
-                    mode = ConnectMode.EnterCode
-                },
-                onBack = {
-                    viewModel.stopDiscovery()
-                    mode = ConnectMode.Home
-                },
-            )
-
-            ConnectMode.EnterCode -> EnterCodeContent(
-                host = selectedHost,
-                codeInput = codeInput,
-                onCodeChange = { raw ->
-                    codeInput = raw.uppercase().filter { ch -> ch.isLetterOrDigit() }
-                        .take(PAIRING_CODE_LENGTH)
-                },
-                canJoin = canJoin,
-                onConnect = {
-                    val target = selectedHost ?: return@EnterCodeContent
-                    if (codeInput.length < PAIRING_CODE_LENGTH) {
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.code_too_short),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                        return@EnterCodeContent
-                    }
-                    viewModel.stopDiscovery()
-                    viewModel.startJoin(
-                        JoinParams(
-                            host = target.host,
-                            port = target.port,
-                            token = codeInput,
-                        ),
-                    )
-                },
-                onBack = {
-                    codeInput = ""
-                    mode = ConnectMode.Discover
-                },
-            )
-
+            ConnectMode.Discover,
+            ConnectMode.EnterCode,
             ConnectMode.Quality,
             ConnectMode.Scan,
             -> Unit
@@ -579,108 +590,3 @@ private fun ActiveCastPanel(
     }
 }
 
-@Composable
-private fun DiscoverContent(
-    hosts: List<DiscoveredHost>,
-    onHostClick: (DiscoveredHost) -> Unit,
-    onBack: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = stringResource(R.string.find_on_wifi),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.looking_for_pcs),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(16.dp))
-
-        if (hosts.isEmpty()) {
-            Text(
-                text = stringResource(R.string.no_pcs_yet),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.weight(1f))
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            ) {
-                items(hosts, key = { it.instanceId }) { host ->
-                    DiscoveredHostCard(
-                        host = host,
-                        onClick = { onHostClick(host) },
-                    )
-                }
-            }
-        }
-
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) {
-            Text(stringResource(R.string.back))
-        }
-    }
-}
-
-@Composable
-private fun EnterCodeContent(
-    host: DiscoveredHost?,
-    codeInput: String,
-    onCodeChange: (String) -> Unit,
-    canJoin: Boolean,
-    onConnect: () -> Unit,
-    onBack: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = stringResource(R.string.enter_code),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = if (host != null) {
-                stringResource(R.string.enter_code_for, host.displayName)
-            } else {
-                stringResource(R.string.pairing_code)
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(28.dp))
-        PairingCodeInput(
-            value = codeInput,
-            onValueChange = onCodeChange,
-            length = PAIRING_CODE_LENGTH,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(20.dp))
-        Button(
-            onClick = onConnect,
-            enabled = canJoin && host != null && codeInput.length == PAIRING_CODE_LENGTH,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.connect))
-        }
-        Spacer(Modifier.weight(1f))
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) {
-            Text(stringResource(R.string.back))
-        }
-    }
-}

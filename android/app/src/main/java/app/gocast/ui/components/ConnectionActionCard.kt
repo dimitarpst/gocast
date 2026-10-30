@@ -111,15 +111,16 @@ fun ConnectionActionCard(
     }
 }
 
-private fun DrawScope.drawWifiSymbol(color: Color) {
+/** The approved Wi‑Fi symbol. [bandAlpha] gets 0 for the inner band up to 2 for the outer one. */
+internal fun DrawScope.drawWifiSymbol(color: Color, bandAlpha: (Int) -> Float = { 1f }) {
     val unit = size.minDimension / 24f
     val line = Stroke(width = 1.8f * unit, cap = StrokeCap.Round)
     val source = Offset(12f * unit, 19f * unit)
     // Concentric bands radiate from the dot, with equal spacing between them.
-    listOf(14f, 9.5f, 5f).forEach { radius ->
+    listOf(14f, 9.5f, 5f).forEachIndexed { index, radius ->
         val radiusPx = radius * unit
         drawArc(
-            color = color,
+            color = color.copy(alpha = color.alpha * bandAlpha(2 - index)),
             startAngle = 225f,
             sweepAngle = 90f,
             useCenter = false,
