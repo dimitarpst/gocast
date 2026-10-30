@@ -72,13 +72,10 @@ import app.gocast.ui.components.LastConnectedCard
 import app.gocast.ui.components.PAIRING_CODE_LENGTH
 import app.gocast.ui.components.PairingCodeInput
 import app.gocast.ui.quality.QualitySettingsScreen
-import io.github.g00fy2.quickie.QRResult
-import io.github.g00fy2.quickie.ScanCustomCode
-import io.github.g00fy2.quickie.config.BarcodeFormat
-import io.github.g00fy2.quickie.config.ScannerConfig
 
 private enum class ConnectMode {
     Home,
+    Scan,
     Discover,
     EnterCode,
     Quality,
@@ -117,40 +114,6 @@ fun ConnectScreen(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         captureLauncher.launch(CaptureConsent.createIntent(context))
-    }
-
-    val scanInvalidMessage = stringResource(R.string.scan_qr_invalid)
-    val cameraDeniedMessage = stringResource(R.string.scan_qr_camera_denied)
-
-    val qrScanner = rememberLauncherForActivityResult(ScanCustomCode()) { result ->
-        when (result) {
-            is QRResult.QRSuccess -> {
-                val raw = result.content.rawValue
-                val uri = raw?.let { Uri.parse(it) }
-                if (JoinUrlParser.parse(uri) == null) {
-                    Toast.makeText(context, scanInvalidMessage, Toast.LENGTH_SHORT).show()
-                    return@rememberLauncherForActivityResult
-                }
-                viewModel.onDeepLink(uri)
-            }
-            is QRResult.QRMissingPermission -> {
-                Toast.makeText(context, cameraDeniedMessage, Toast.LENGTH_SHORT).show()
-            }
-            is QRResult.QRUserCanceled,
-            is QRResult.QRError,
-            -> Unit
-        }
-    }
-
-    val scannerConfig = remember {
-        ScannerConfig.build {
-            setBarcodeFormats(listOf(BarcodeFormat.FORMAT_QR_CODE))
-            setOverlayDrawableRes(R.drawable.ic_qr_code)
-            setOverlayStringRes(R.string.scan_qr_hint)
-            setHapticSuccessFeedback(true)
-            setShowTorchToggle(true)
-            setShowCloseButton(true)
-        }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -222,14 +185,19 @@ fun ConnectScreen(
                     viewModel.stopDiscovery()
                 }
             }
-            ConnectMode.EnterCode -> Unit
+            // Scanning leaves Home's discovery as it was, like the old scanner activity did.
+            ConnectMode.Scan,
+            ConnectMode.EnterCode,
+            -> Unit
             ConnectMode.Quality -> viewModel.stopDiscovery()
         }
     }
 
     BackHandler(enabled = mode != ConnectMode.Home) {
         when (mode) {
-            ConnectMode.Quality -> mode = ConnectMode.Home
+            ConnectMode.Quality,
+            ConnectMode.Scan,
+            -> mode = ConnectMode.Home
             ConnectMode.Discover,
             ConnectMode.EnterCode,
             -> {
@@ -244,6 +212,18 @@ fun ConnectScreen(
 
     if (mode == ConnectMode.Quality) {
         QualitySettingsScreen(onBack = { mode = ConnectMode.Home })
+        return
+    }
+
+    if (mode == ConnectMode.Scan) {
+        QrScanScreen(
+            onScanned = { uri ->
+                mode = ConnectMode.Home
+                viewModel.onDeepLink(uri)
+            },
+            onBack = { mode = ConnectMode.Home },
+            onFindWifi = { mode = ConnectMode.Discover },
+        )
         return
     }
 
@@ -296,7 +276,7 @@ fun ConnectScreen(
                             Toast.LENGTH_LONG,
                         ).show()
                     },
-                    onScanQr = { qrScanner.launch(scannerConfig) },
+                    onScanQr = { mode = ConnectMode.Scan },
                     onFindWifi = { mode = ConnectMode.Discover },
                     onResume = { viewModel.onResumeCastRequested() },
                     onStop = { viewModel.stopCast() },
@@ -351,7 +331,9 @@ fun ConnectScreen(
                 },
             )
 
-            ConnectMode.Quality -> Unit
+            ConnectMode.Quality,
+            ConnectMode.Scan,
+            -> Unit
         }
     }
 }
