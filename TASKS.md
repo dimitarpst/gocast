@@ -16,7 +16,7 @@ This is the persistent working list. Update it when work starts, scope changes, 
 
 ## Product backlog
 
-- [ ] **UX-01 — Replace onboarding demonstrations with real contextual guidance.** Use the researched smooth overlay and failure-aware journey; no fake success or filler pages. See [research](research/onboarding/README.md).
+- [ ] **UX-01 — Replace onboarding demonstrations with real contextual guidance.** Use the researched smooth overlay and failure-aware journey; no fake success or filler pages. See [research](research/onboarding/README.md). Fake demos removed in UI-05; contextual guidance not started.
 - [ ] **DES-01 — Establish the Go experience.** Consistent visual foundations across GoCast phone/PC and future Go apps. See [design direction](research/go-design-language.md).
 - [ ] **DES-02 — Explore a custom Go font and shared logo construction rules.** Record the two-colour vector direction as an input, not a finished specification.
 - [ ] **NET-01 — Discuss and diagnose phone-to-PC connection failure.** Discussed 29 Oct: the user suspects dorm Wi-Fi client isolation (unconfirmed). Decision: connect across networks through Cloudflare signaling + STUN/TURN; see [plan](research/remote-connection.md). Do not change connection behaviour as part of UI or installer work.
@@ -34,6 +34,14 @@ This is the persistent working list. Update it when work starts, scope changes, 
 - [ ] **DEL-06 — Download and setup handoff.** Progress/cancel, bounded HTTPS redirects, size/SHA-256 verification, cached completed downloads across restarts, recheck before opening, and active-connection/cast guard implemented. Tests added for version/asset/redirect boundaries and changed downloads, but not run. SHA-256/TLS verifies delivery from the repository; independent publisher-signature validation is not implemented or claimed. Production signing belongs to DEL-08.
 - [ ] **DEV-01 — Refresh Phone / PC / Both launchers.** Update installed development apps without repetitive uninstalling; save session logs. Some earlier runs were checked, but this does not validate Windows installer maintenance.
 - [ ] **UI-02 — Reuse the approved QR symbol inside the scanner.** One vector resource shared with the action button; no build/device check performed for this change.
+- [ ] **UI-05 — Phone UI polish.** Every screen now keeps clear of the status bar, 3-button/gesture nav bar, cutouts and keyboard. Quality screen redesigned after [research](research/quality-settings-ui.md):
+  - borderless rounded groups;
+  - Profile rows with a check mark;
+  - pill buttons;
+  - one "Detailed settings" row that opens five headed groups (Picture, Bitrate, Streaming, Video format, Compatibility);
+  - each setting is a tap-to-pick row showing its value, with "Recommended" on the Balanced default and help (ⓘ) inside the picker.
+
+  Setting values are unchanged; names are plain (e.g. "Keep it sharp", "Video priority"). "How it works" is one page; fake sharing/quality demos removed. Built and installed with Refresh Phone (build 20261030-034643-028). I checked the closed screen on a screenshot; the opened detailed settings haven't been looked at. User check on the phone pending.
 - [ ] **UI-04 — PC identity header.** Removed the pill and permanent Rename text after user feedback. Name is a compact transparent clickable control; hover/keyboard focus reveals a faded edit icon and subtle surface, with space reserved to prevent movement. Opens the approved modal. Specific pattern research saved in [research/pc-name-editing.md](research/pc-name-editing.md). Refresh PC.cmd rebuilt and relaunched successfully (build 20261025-045230-571). Visual review pending.
 
 ## Completed research / recorded requirements
