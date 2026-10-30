@@ -542,6 +542,22 @@ private fun ActiveCastPanel(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        val codecFallback by CastLinkMonitor.codecFallback.collectAsStateWithLifecycle()
+        val fallback = codecFallback
+        if (!paused && fallback != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(
+                    R.string.codec_fallback,
+                    CastLinkMonitor.codecLabel(fallback.wanted),
+                    CastLinkMonitor.codecLabel(fallback.used),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.tertiary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (paused) {
             Spacer(Modifier.height(12.dp))
             Text(
