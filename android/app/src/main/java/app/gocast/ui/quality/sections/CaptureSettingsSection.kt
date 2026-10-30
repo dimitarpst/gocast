@@ -4,64 +4,56 @@ import androidx.compose.runtime.Composable
 import app.gocast.settings.CastQualitySettings
 import app.gocast.settings.SettingHelpCatalog
 import app.gocast.ui.quality.QualityUiActions
-import app.gocast.ui.quality.components.OptionDropdown
-import app.gocast.ui.quality.components.SettingRow
+import app.gocast.ui.quality.components.OptionPicker
 
 @Composable
 fun CaptureSettingsSection(
     settings: CastQualitySettings,
     actions: QualityUiActions,
 ) {
-    SettingRow(
+    val recommended = CastQualitySettings.Default
+    OptionPicker(
+        label = "Picture size",
+        selectedLabel = CastQualitySettings.ResolutionScaleOptions
+            .firstOrNull { it.first == settings.resolutionScale }?.second
+            ?: "${(settings.resolutionScale * 100).toInt()}%",
+        options = CastQualitySettings.ResolutionScaleOptions.map { it.second },
+        recommendedIndex = CastQualitySettings.ResolutionScaleOptions
+            .indexOfFirst { it.first == recommended.resolutionScale },
         help = SettingHelpCatalog.resolutionScale,
         onInfo = actions.onInfo,
-        onCostTap = actions.onCostTap,
-    ) {
-        OptionDropdown(
-            label = "Resolution scale",
-            selectedLabel = CastQualitySettings.ResolutionScaleOptions
-                .firstOrNull { it.first == settings.resolutionScale }?.second
-                ?: "${(settings.resolutionScale * 100).toInt()}%",
-            options = CastQualitySettings.ResolutionScaleOptions.map { it.second },
-            onSelectIndex = { index ->
-                actions.onChange(
-                    settings.copy(
-                        resolutionScale = CastQualitySettings.ResolutionScaleOptions[index].first,
-                    ),
-                )
-            },
-        )
-    }
-    SettingRow(
+        onSelectIndex = { index ->
+            actions.onChange(
+                settings.copy(
+                    resolutionScale = CastQualitySettings.ResolutionScaleOptions[index].first,
+                ),
+            )
+        },
+    )
+    OptionPicker(
+        label = "Capture frame rate",
+        selectedLabel = "${settings.captureFps} fps",
+        options = CastQualitySettings.FpsOptions.map { "$it fps" },
+        recommendedIndex = CastQualitySettings.FpsOptions.indexOf(recommended.captureFps),
         help = SettingHelpCatalog.captureFps,
         onInfo = actions.onInfo,
-        onCostTap = actions.onCostTap,
-    ) {
-        OptionDropdown(
-            label = "Capture FPS",
-            selectedLabel = "${settings.captureFps}",
-            options = CastQualitySettings.FpsOptions.map { "$it" },
-            onSelectIndex = { index ->
-                actions.onChange(
-                    settings.copy(captureFps = CastQualitySettings.FpsOptions[index]),
-                )
-            },
-        )
-    }
-    SettingRow(
+        onSelectIndex = { index ->
+            actions.onChange(
+                settings.copy(captureFps = CastQualitySettings.FpsOptions[index]),
+            )
+        },
+    )
+    OptionPicker(
+        label = "Screen density",
+        selectedLabel = "${settings.virtualDisplayDpi} dpi",
+        options = CastQualitySettings.DpiOptions.map { "$it dpi" },
+        recommendedIndex = CastQualitySettings.DpiOptions.indexOf(recommended.virtualDisplayDpi),
         help = SettingHelpCatalog.virtualDisplayDpi,
         onInfo = actions.onInfo,
-        onCostTap = actions.onCostTap,
-    ) {
-        OptionDropdown(
-            label = "Virtual display DPI",
-            selectedLabel = "${settings.virtualDisplayDpi}",
-            options = CastQualitySettings.DpiOptions.map { "$it" },
-            onSelectIndex = { index ->
-                actions.onChange(
-                    settings.copy(virtualDisplayDpi = CastQualitySettings.DpiOptions[index]),
-                )
-            },
-        )
-    }
+        onSelectIndex = { index ->
+            actions.onChange(
+                settings.copy(virtualDisplayDpi = CastQualitySettings.DpiOptions[index]),
+            )
+        },
+    )
 }

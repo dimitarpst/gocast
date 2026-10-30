@@ -2,6 +2,8 @@ package app.gocast.ui.quality
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,19 +12,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,9 +39,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,14 +57,15 @@ import app.gocast.settings.CostChip
 import app.gocast.settings.QualityRecommendation
 import app.gocast.settings.QualityRecommender
 import app.gocast.settings.SettingHelp
-import app.gocast.ui.quality.components.AccordionSection
 import app.gocast.ui.quality.components.CostChipRow
-import app.gocast.ui.quality.components.ProfileCard
+import app.gocast.ui.quality.components.ProfileRow
+import app.gocast.ui.quality.components.SettingsGroup
 import app.gocast.ui.quality.components.costColor
 import app.gocast.ui.quality.sections.BitrateSettingsSection
 import app.gocast.ui.quality.sections.CaptureSettingsSection
 import app.gocast.ui.quality.sections.CodecSettingsSection
 import app.gocast.ui.quality.sections.EncoderSettingsSection
+import app.gocast.ui.quality.sections.StreamingSettingsSection
 import kotlinx.coroutines.delay
 
 private enum class AutosaveStatus {
@@ -73,7 +84,7 @@ fun QualitySettingsScreen(
     var activeProfileId by remember {
         mutableStateOf(CastQualityStore.activeProfileId(context))
     }
-    var expandedSection by remember { mutableStateOf<String?>(null) }
+    var detailsOpen by rememberSaveable { mutableStateOf(false) }
     var helpTarget by remember { mutableStateOf<SettingHelp?>(null) }
     var showSaveDialog by remember { mutableStateOf(false) }
     var saveName by remember { mutableStateOf("") }
@@ -147,23 +158,30 @@ fun QualitySettingsScreen(
     val actions = QualityUiActions(
         onChange = ::persistSettings,
         onInfo = { helpTarget = it },
-        onCostTap = { weightPopup = it },
     )
-    val isCustomSettings = profiles.none { it.settings == settings }
-
     Column(
         Modifier
             .fillMaxSize()
-            .statusBarsPadding()
+            .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 32.dp),
     ) {
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Cast quality", style = MaterialTheme.typography.headlineSmall)
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.back),
+                )
+            }
+            Text(
+                "Quality",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.weight(1f),
+            )
             when (autosaveStatus) {
                 AutosaveStatus.Idle -> Unit
                 AutosaveStatus.Saving -> Text(
@@ -172,186 +190,100 @@ fun QualitySettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 AutosaveStatus.Autosaved -> Text(
-                    "Autosaved",
+                    "Saved",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
-        Text(
-            "Like game graphics presets — pick a profile, or tune and save your own. " +
-                "Changes apply while casting (codec/encoder may briefly reconnect).",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
 
-        Button(
-            onClick = {
-                if (!detecting) {
-                    recommendation = null
-                    detecting = true
+        SettingsGroup(title = "Profile") {
+            profiles.forEach { profile ->
+                val selected = when {
+                    activeProfileId != null -> activeProfileId == profile.id
+                    else -> settings == profile.settings
                 }
-            },
-            enabled = !detecting,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (detecting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
-                Spacer(Modifier.width(10.dp))
-                Text("Checking your phone…")
-            } else {
-                Text("Auto-detect best profile")
-            }
-        }
-
-        AnimatedVisibility(visible = recommendation != null && !detecting) {
-            val tip = recommendation
-            if (tip != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp, bottom = 4.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    ),
-                ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(
-                            "Recommended: ${tip.profile.name}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            tip.reason,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        Text("Profiles", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-
-        profiles.forEach { profile ->
-            val selected = when {
-                activeProfileId != null -> activeProfileId == profile.id
-                else -> settings == profile.settings
-            }
-            ProfileCard(
-                profile = profile,
-                selected = selected,
-                onSelect = { selectProfile(profile) },
-                onDelete = if (!profile.builtIn) {
-                    {
-                        CastQualityStore.deleteUserProfile(context, profile.id)
-                        refreshProfiles()
-                        settings = CastQualityStore.load(context)
-                        activeProfileId = CastQualityStore.activeProfileId(context)
-                    }
-                } else {
-                    null
-                },
-            )
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ),
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = stringResource(
-                        if (isCustomSettings) R.string.quality_custom_title
-                        else R.string.quality_save_title,
-                    ),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = stringResource(
-                        if (isCustomSettings) R.string.quality_custom_description
-                        else R.string.quality_save_description,
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(
-                    onClick = {
-                        saveName = ""
-                        showSaveDialog = true
+                ProfileRow(
+                    profile = profile,
+                    selected = selected,
+                    recommended = !detecting && recommendation?.profile?.id == profile.id,
+                    onSelect = { selectProfile(profile) },
+                    onDelete = if (!profile.builtIn) {
+                        {
+                            CastQualityStore.deleteUserProfile(context, profile.id)
+                            refreshProfiles()
+                            settings = CastQualityStore.load(context)
+                            activeProfileId = CastQualityStore.activeProfileId(context)
+                        }
+                    } else {
+                        null
                     },
-                    modifier = Modifier.padding(top = 4.dp),
-                ) {
-                    Text(stringResource(R.string.quality_save_profile))
-                }
+                )
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-        Text("Detailed settings", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Tap a section to expand it.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
+            Modifier.fillMaxWidth().padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilledTonalButton(
+                onClick = {
+                    if (!detecting) {
+                        recommendation = null
+                        detecting = true
+                    }
+                },
+                enabled = !detecting,
+                shape = CircleShape,
+                modifier = Modifier.weight(1f),
+            ) {
+                if (detecting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = LocalContentColor.current,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Checking…")
+                } else {
+                    Text("Auto-detect")
+                }
+            }
+            FilledTonalButton(
+                onClick = {
+                    saveName = ""
+                    showSaveDialog = true
+                },
+                shape = CircleShape,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.quality_save_profile))
+            }
+        }
+
+        DetailedSettingsToggle(
+            open = detailsOpen,
+            onToggle = { detailsOpen = !detailsOpen },
         )
-        Spacer(Modifier.height(8.dp))
-
-        AccordionSection(
-            title = "Capture",
-            expanded = expandedSection == "capture",
-            onToggle = {
-                expandedSection = if (expandedSection == "capture") null else "capture"
-            },
-        ) {
-            CaptureSettingsSection(settings = settings, actions = actions)
+        AnimatedVisibility(visible = detailsOpen) {
+            Column {
+                SettingsGroup(title = "Picture") {
+                    CaptureSettingsSection(settings = settings, actions = actions)
+                }
+                SettingsGroup(title = "Bitrate") {
+                    BitrateSettingsSection(settings = settings, actions = actions)
+                }
+                SettingsGroup(title = "Streaming") {
+                    StreamingSettingsSection(settings = settings, actions = actions)
+                }
+                SettingsGroup(title = "Video format") {
+                    CodecSettingsSection(settings = settings, actions = actions)
+                }
+                SettingsGroup(title = "Compatibility") {
+                    EncoderSettingsSection(settings = settings, actions = actions)
+                }
+            }
         }
-
-        AccordionSection(
-            title = "Codec",
-            expanded = expandedSection == "codec",
-            onToggle = {
-                expandedSection = if (expandedSection == "codec") null else "codec"
-            },
-        ) {
-            CodecSettingsSection(settings = settings, actions = actions)
-        }
-
-        AccordionSection(
-            title = "Bitrate & framerate",
-            expanded = expandedSection == "bitrate",
-            onToggle = {
-                expandedSection = if (expandedSection == "bitrate") null else "bitrate"
-            },
-        ) {
-            BitrateSettingsSection(settings = settings, actions = actions)
-        }
-
-        AccordionSection(
-            title = "Encoder",
-            expanded = expandedSection == "encoder",
-            onToggle = {
-                expandedSection = if (expandedSection == "encoder") null else "encoder"
-            },
-        ) {
-            EncoderSettingsSection(settings = settings, actions = actions)
-        }
-
-        Spacer(Modifier.height(24.dp))
     }
 
     helpTarget?.let { help ->
@@ -420,5 +352,35 @@ fun QualitySettingsScreen(
                 TextButton(onClick = { showSaveDialog = false }) { Text("Cancel") }
             },
         )
+    }
+}
+
+/** One row that reveals every detailed setting; the chevron turns to point down when open. */
+@Composable
+private fun DetailedSettingsToggle(open: Boolean, onToggle: () -> Unit) {
+    val rotation by animateFloatAsState(if (open) 90f else 0f, label = "chevron")
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(top = 28.dp),
+    ) {
+        Row(
+            Modifier
+                .clickable(onClick = onToggle)
+                .padding(start = 16.dp, end = 12.dp, top = 16.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Detailed settings",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.rotate(rotation),
+            )
+        }
     }
 }
