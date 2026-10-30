@@ -520,8 +520,9 @@ object ViewerPage {
       return remoteType === 'host' && isLocalAddress(localAddress) ? 'Direct (LAN)' : 'Direct (internet)';
     }
 
+    // The link type is logged (console + PC log), not shown: users only need "Casting".
     function castingStatus() {
-      return linkType ? 'Casting · ' + linkType : 'Casting';
+      return 'Casting';
     }
 
     async function refreshLinkType() {
