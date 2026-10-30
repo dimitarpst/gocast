@@ -564,7 +564,34 @@ object ViewerPage {
       return INITIAL_ICE_SERVERS;
     }
 
+    // A dead video link (the phone switched networks, a relay hiccup) is rebuilt by
+    // asking the phone for a fresh offer, so nobody has to press Retry. Repeats
+    // until a new connection is on its way.
+    let recoverTimer = null;
+    function scheduleRecovery(delayMs) {
+      if (recoverTimer) return;
+      recoverTimer = setTimeout(() => {
+        recoverTimer = null;
+        if (streamPaused || !pc) return;
+        const state = pc.connectionState;
+        if (state === 'new' || state === 'connecting' || state === 'connected') return;
+        if (ws.readyState === WebSocket.OPEN) {
+          console.log('gocast: video link ' + state + ', asking the phone for a fresh offer');
+          ws.send(JSON.stringify({ type: 'viewer-ready' }));
+        }
+        scheduleRecovery(RECOVER_REPEAT_MS);
+      }, delayMs);
+    }
+    function cancelRecovery() {
+      clearTimeout(recoverTimer);
+      recoverTimer = null;
+    }
+    const RECOVER_REPEAT_MS = 6000;
+    // "disconnected" often heals by itself within a few seconds; "failed" never does.
+    const RECOVER_AFTER_DISCONNECT_MS = 4000;
+
     function wirePeerConnection(iceServers) {
+      cancelRecovery();
       if (pc) {
         try { pc.close(); } catch (_) {}
       }
@@ -606,6 +633,7 @@ object ViewerPage {
         if (streamPaused) return;
         const state = pc.connectionState;
         if (state === 'connected') {
+          cancelRecovery();
           setStatus('Connected');
           // The pair can change (relay first, direct later), so keep looking.
           refreshLinkType();
@@ -615,6 +643,8 @@ object ViewerPage {
           setStatus('Connecting…');
         } else if (state === 'failed' || state === 'closed' || state === 'disconnected') {
           setStatus('Connection lost — waiting for phone…');
+          if (state === 'failed') scheduleRecovery(0);
+          if (state === 'disconnected') scheduleRecovery(RECOVER_AFTER_DISCONNECT_MS);
         }
       };
       pc.onicecandidate = (event) => {

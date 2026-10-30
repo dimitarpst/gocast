@@ -11,6 +11,7 @@
     <string name="connected">Connected!</string>
     <string name="reconnecting">Reconnecting…</string>
     <string name="reaching_pc">Trying to reach your PC…</string>
+    <string name="refresh_cast">Picture stuck? Refresh</string>
     <string name="find_on_wifi">Find on Wi-Fi</string>
     <string name="cast_to_pc">Cast to %1$s</string>
     <string name="last_connected">Last connected</string>

@@ -41,7 +41,6 @@ class SessionConnector(
                 }
                 when (val result = session.open(params)) {
                     is HelloResult.Ok -> {
-                        _state.value = ConnectionState.Connected
                         _paired.tryEmit(
                             PairedSession(
                                 host = params.host,
@@ -52,7 +51,12 @@ class SessionConnector(
                                 displayName = result.displayName,
                             ),
                         )
-                        val endedByServer = session.runMessageLoop()
+                        // Connected only once the socket forwards messages: after a
+                        // reconnect the publisher's "phone-media-ready" was dropped
+                        // otherwise, and the PC stayed frozen until Retry (30 Oct).
+                        val endedByServer = session.runMessageLoop(
+                            onReady = { _state.value = ConnectionState.Connected },
+                        )
                         if (!isActive) return@launch
                         if (endedByServer) {
                             _state.value = ConnectionState.Idle

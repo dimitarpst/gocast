@@ -18,12 +18,25 @@ internal class NetworkWatch(context: Context, private val onSwitched: () -> Unit
     @Volatile
     private var lastNetwork: Network? = null
 
+    @Volatile
+    private var lostSinceLast = false
+
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             val previous = lastNetwork
             lastNetwork = network
-            // The first call is the network we already had at registration.
-            if (previous != null && previous != network) onSwitched()
+            val lost = lostSinceLast
+            lostSinceLast = false
+            // The first call is the network we already had at registration. After a
+            // loss, even the same network coming back needs a fresh connection.
+            if (lost || (previous != null && previous != network)) onSwitched()
+        }
+
+        override fun onLost(network: Network) {
+            if (network != lastNetwork) return
+            // No internet at all: show Reconnecting now rather than after the ping timeout.
+            lostSinceLast = true
+            onSwitched()
         }
     }
 

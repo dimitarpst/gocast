@@ -16,6 +16,7 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -170,19 +171,24 @@ class SignalingSession(
 
     /**
      * Keeps the socket alive until it drops or the PC ends the session.
+     * @param onReady called once outgoing messages are being forwarded. Report
+     *   Connected only then: SignalingBridge drops messages nobody collects yet,
+     *   and the publisher announces itself the moment it sees Connected.
      * @return true if the PC sent session-ended (do not auto-reconnect).
      */
-    suspend fun runMessageLoop(): Boolean {
+    suspend fun runMessageLoop(onReady: () -> Unit = {}): Boolean {
         val ws = session ?: return false
         val remote = transport == Transport.Remote
         var endedByServer = false
         try {
             coroutineScope {
-                val outgoingJob = launch {
+                // Undispatched: subscribed to the bridge before onReady runs.
+                val outgoingJob = launch(start = CoroutineStart.UNDISPATCHED) {
                     SignalingBridge.outgoing.collect { text ->
                         ws.send(Frame.Text(text))
                     }
                 }
+                onReady()
                 // The Worker answers pings without waking the room; credentials expire after 4 h.
                 val keepAlive = if (remote) {
                     launch {
