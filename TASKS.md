@@ -41,7 +41,7 @@ This is the persistent working list. Update it when work starts, scope changes, 
   - one "Detailed settings" row that opens five headed groups (Picture, Bitrate, Streaming, Video format, Compatibility);
   - each setting is a tap-to-pick row showing its value, with "Recommended" on the Balanced default and help (ⓘ) inside the picker.
 
-  Setting values are unchanged; names are plain (e.g. "Keep it sharp", "Video priority"). "How it works" is one page; fake sharing/quality demos removed. Built and installed with Refresh Phone (build 20261030-034643-028). I checked the closed screen on a screenshot; the opened detailed settings haven't been looked at. User check on the phone pending.
+  Setting values are unchanged; names are plain (e.g. "Keep it sharp", "Video priority"). "How it works" is one page; fake sharing/quality demos removed. Built and installed with Refresh Phone (build 20261030-034643-028). User looked at the Quality screen on the Poco and approved it (30 Oct). The nav-bar spacing and "How it works" were not separately confirmed, and the Xiaomi 15T Pro was not checked. User check on the phone pending.
 - [ ] **UI-04 — PC identity header.** Removed the pill and permanent Rename text after user feedback. Name is a compact transparent clickable control; hover/keyboard focus reveals a faded edit icon and subtle surface, with space reserved to prevent movement. Opens the approved modal. Specific pattern research saved in [research/pc-name-editing.md](research/pc-name-editing.md). Refresh PC.cmd rebuilt and relaunched successfully (build 20261025-045230-571). Visual review pending.
 
 ## Completed research / recorded requirements
