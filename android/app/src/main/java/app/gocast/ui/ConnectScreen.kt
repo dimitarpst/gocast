@@ -348,6 +348,8 @@ fun ConnectScreen(
                         host = target.host,
                         port = target.port,
                         token = codeInput,
+                        // From the Bluetooth beacon: join through the relay, LAN as fallback.
+                        roomId = target.roomId,
                     ),
                 )
             },

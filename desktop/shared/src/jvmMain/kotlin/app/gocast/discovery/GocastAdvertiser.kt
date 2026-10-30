@@ -19,14 +19,21 @@ class GocastAdvertiser {
 
     /**
      * @param host Prefer the same address shown in the QR. When null, resolves again.
+     * @param roomId The relay room, broadcast over Bluetooth so nearby phones join through it.
      */
-    fun start(port: Int, instanceId: String, displayName: String, host: String? = null) {
+    fun start(
+        port: Int,
+        instanceId: String,
+        displayName: String,
+        host: String? = null,
+        roomId: String? = null,
+    ) {
         stop()
         val lanIp = host
             ?.takeIf { it.isNotBlank() && it != "127.0.0.1" }
             ?: LocalIpResolver.resolve()
         // Independent of mDNS: a Bluetooth failure must never block LAN discovery.
-        runCatching { beacon.start(lanIp, port, displayName) }
+        runCatching { beacon.start(lanIp, port, displayName, roomId) }
         val addr = runCatching { InetAddress.getByName(lanIp) }.getOrNull()
             ?.takeUnless { it.isLoopbackAddress }
         val dns = if (addr != null) {

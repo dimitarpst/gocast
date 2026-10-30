@@ -20,9 +20,10 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Finds GoCast PCs nearby from their Bluetooth LE beacon, even when they are
- * on another network. The beacon carries the PC's LAN address, so joining it
- * still uses the normal pairing-code flow.
+ * Finds GoCast PCs nearby from their Bluetooth LE beacons, even when they are
+ * on another network. The Bluetooth 5 beacon carries the PC's relay room, so
+ * joining goes through the relay with the usual pairing code; the short
+ * beacon only has the LAN address.
  */
 class GocastBluetoothDiscovery(context: Context) {
     private val appContext = context.applicationContext
@@ -35,7 +36,8 @@ class GocastBluetoothDiscovery(context: Context) {
     // Callers request BLUETOOTH_SCAN (Android 12+) or location (10–11) first.
     @SuppressLint("MissingPermission")
     fun discover(): Flow<List<DiscoveredHost>> = callbackFlow {
-        val scanner = adapter()?.takeIf { it.isEnabled }?.bluetoothLeScanner
+        val adapter = adapter()?.takeIf { it.isEnabled }
+        val scanner = adapter?.bluetoothLeScanner
         if (scanner == null) {
             close()
             return@callbackFlow
@@ -53,12 +55,21 @@ class GocastBluetoothDiscovery(context: Context) {
                 val data = result.scanRecord
                     ?.getManufacturerSpecificData(BeaconPayload.COMPANY_ID) ?: return
                 val beacon = BeaconPayload.decode(data) ?: return
+                // Both beacons of one PC share its address; keep the room and
+                // the longer name once the Bluetooth 5 one has been heard.
                 val key = "bt:${beacon.host}:${beacon.port}"
+                val known = lastSeen[key]?.first
+                val roomId = beacon.roomId ?: known?.roomId
                 lastSeen[key] = DiscoveredHost(
-                    displayName = beacon.displayName,
+                    displayName = if (beacon.roomId == null && known?.roomId != null) {
+                        known.displayName
+                    } else {
+                        beacon.displayName
+                    },
                     host = beacon.host,
                     port = beacon.port,
                     instanceId = key,
+                    roomId = roomId,
                 ) to SystemClock.elapsedRealtime()
                 emitHosts()
             }
@@ -75,6 +86,13 @@ class GocastBluetoothDiscovery(context: Context) {
             .build()
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .apply {
+                // Also hear the Bluetooth 5 beacon that carries the room, where the chip can.
+                if (adapter?.isLeExtendedAdvertisingSupported == true) {
+                    setLegacy(false)
+                    setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
+                }
+            }
             .build()
         scanner.startScan(listOf(filter), settings, callback)
         emitHosts()

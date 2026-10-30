@@ -15,4 +15,6 @@ data class DiscoveredHost(
     val host: String,
     val port: Int,
     val instanceId: String,
+    /** The PC's relay room, from its Bluetooth beacon; null from mDNS. */
+    val roomId: String? = null,
 )
