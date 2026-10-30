@@ -1,5 +1,6 @@
 package app.gocast.network
 
+import android.os.SystemClock
 import app.gocast.domain.ConnectionState
 import app.gocast.protocol.JoinParams
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +30,11 @@ class SessionConnector(
 
     private var connectJob: Job? = null
 
+    /** When the current link came up (elapsedRealtime), to tell a fresh link from a stale one. */
+    @Volatile
+    var connectedAtMs: Long = 0L
+        private set
+
     /** @param resuming true to show Reconnecting rather than Connecting from the first attempt. */
     fun start(params: JoinParams, resuming: Boolean = false) {
         stop(clearState = false)
@@ -56,7 +62,10 @@ class SessionConnector(
                         // reconnect the publisher's "phone-media-ready" was dropped
                         // otherwise, and the PC stayed frozen until Retry (30 Oct).
                         val endedByServer = session.runMessageLoop(
-                            onReady = { _state.value = ConnectionState.Connected },
+                            onReady = {
+                                connectedAtMs = SystemClock.elapsedRealtime()
+                                _state.value = ConnectionState.Connected
+                            },
                         )
                         if (!isActive) return@launch
                         if (endedByServer) {

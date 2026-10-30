@@ -2,6 +2,7 @@ package app.gocast.network
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.util.Log
 import app.gocast.capture.CaptureService
 import app.gocast.domain.ConnectionState
@@ -61,7 +62,10 @@ object CastConnection {
         if (networkWatch == null) {
             networkWatch = NetworkWatch(
                 context.applicationContext,
-                onSwitched = { scope.launch { reconnectSoon(networkSwitched = true) } },
+                onSwitched = {
+                    switchedAtMs = SystemClock.elapsedRealtime()
+                    scope.launch { reconnectSoon(networkSwitched = true) }
+                },
                 onInternetBack = { scope.launch { reconnectSoon(networkSwitched = false) } },
             )
         }
@@ -69,6 +73,9 @@ object CastConnection {
 
     @Volatile
     private var pendingSwitch = false
+
+    @Volatile
+    private var switchedAtMs = 0L
 
     /**
      * The phone changed network (the old socket and media path are dead), or the
@@ -88,7 +95,12 @@ object CastConnection {
                 is ConnectionState.Idle,
                 is ConnectionState.Connecting,
                 -> Unit
-                is ConnectionState.Connected -> if (switched) connector.start(params, resuming = true)
+                // A link made after the switch is already on the new network: keep it.
+                // Restarting it anyway (seen 30 Oct) only added another round trip.
+                is ConnectionState.Connected ->
+                    if (switched && connector.connectedAtMs < switchedAtMs) {
+                        connector.start(params, resuming = true)
+                    }
                 is ConnectionState.Reconnecting,
                 is ConnectionState.Failed,
                 -> connector.start(params, resuming = true)

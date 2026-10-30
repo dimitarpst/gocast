@@ -175,6 +175,23 @@ describe("one phone per room", () => {
 		second.close();
 	});
 
+	it("routes the PC's replies to a phone that reconnects again and again", async () => {
+		// Wi-Fi ↔ mobile data: each switch leaves the previous socket behind. Every
+		// new phone must still get the PC's "ok" (30 Oct: they all timed out).
+		const roomId = newRoomId();
+		const { pc } = await acceptedPair(roomId);
+		for (let i = 0; i < 3; i++) {
+			const next = await Peer.connect(roomId, "phone");
+			const nextId = (await pc.nextOfType("phone-joined")).phoneId;
+			next.send({ type: "hello", token: "trusted" });
+			await pc.nextOfType("hello");
+			pc.send({ type: "phone-accepted", phoneId: nextId });
+			pc.send({ type: "ok", instanceId: `pc-${i}` });
+			expect(await next.nextOfType("ok")).toEqual({ type: "ok", instanceId: `pc-${i}` });
+		}
+		pc.close();
+	});
+
 	it("closes a phone the PC rejects", async () => {
 		const roomId = newRoomId();
 		const pc = await Peer.connect(roomId, "pc", PC_KEY);
