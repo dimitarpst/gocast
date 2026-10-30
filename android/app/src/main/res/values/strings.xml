@@ -3,7 +3,9 @@
     <string name="scan_qr">Scan QR</string>
     <string name="scan_qr_hint">Point at the GoCast QR on your PC</string>
     <string name="scan_qr_invalid">Not a GoCast QR code</string>
-    <string name="scan_qr_camera_denied">Camera permission is required to scan</string>
+    <string name="scan_qr_camera_denied">Allow camera access to scan</string>
+    <string name="scan_open_settings">Open settings</string>
+    <string name="scan_flashlight">Flashlight</string>
     <string name="connect_idle">Connect to cast</string>
     <string name="connecting">Connecting…</string>
     <string name="connected">Connected!</string>
