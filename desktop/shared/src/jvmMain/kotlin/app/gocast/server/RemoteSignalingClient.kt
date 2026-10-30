@@ -154,8 +154,12 @@ class RemoteSignalingClient(
 
     private suspend fun handle(session: DefaultClientWebSocketSession, text: String) {
         when (val control = RemoteSignaling.parseControl(text)) {
-            is RemoteControl.PhoneJoined -> pendingPhoneId = control.phoneId
+            is RemoteControl.PhoneJoined -> {
+                println("Relay phone joined: ${control.phoneId.take(8)}")
+                pendingPhoneId = control.phoneId
+            }
             is RemoteControl.PhoneLeft -> {
+                println("Relay phone left: ${control.phoneId.take(8)}")
                 if (pendingPhoneId == control.phoneId) pendingPhoneId = null
                 val phone = acceptedPhone
                 if (phone?.phoneId == control.phoneId) {
@@ -191,12 +195,18 @@ class RemoteSignalingClient(
             if (acceptedPhone != null) protocol.onPhoneMessage(text)
             return
         }
-        val phoneId = pendingPhoneId ?: return
+        val phoneId = pendingPhoneId ?: run {
+            // Suspected cause of the phone's 8 s "no reply to hello" after a network switch.
+            println("Relay hello ignored: no phone waiting")
+            return
+        }
         val reply = protocol.helloReply(hello)
         if (reply == null) {
+            println("Relay phone rejected: ${phoneId.take(8)}")
             session.send(Frame.Text(RemoteSignaling.phoneRejected(phoneId)))
             return
         }
+        println("Relay phone accepted: ${phoneId.take(8)}")
         // Like the LAN path, a valid new phone replaces the current one.
         pendingPhoneId = null
         val phone = RemotePhoneLink(phoneId, session)

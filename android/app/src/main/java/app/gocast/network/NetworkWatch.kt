@@ -9,8 +9,17 @@ import android.net.NetworkCapabilities
  * Follows the phone's default network so a cast moves the moment the phone
  * switches (Wi-Fi ↔ mobile data), instead of waiting for the old socket to
  * time out.
+ *
+ * @param onSwitched the default network changed or was lost: the old link is dead.
+ * @param onInternetBack the new network just proved it reaches the internet. A
+ *   fresh Wi-Fi often has no working DNS for a few seconds (seen 30 Oct), so
+ *   attempts made in that window fail and back off; this restarts them on time.
  */
-internal class NetworkWatch(context: Context, private val onSwitched: () -> Unit) {
+internal class NetworkWatch(
+    context: Context,
+    private val onSwitched: () -> Unit,
+    private val onInternetBack: () -> Unit,
+) {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 
     // Not cleared on loss: Wi-Fi off reports "lost Wi-Fi" then "mobile data
@@ -21,6 +30,9 @@ internal class NetworkWatch(context: Context, private val onSwitched: () -> Unit
     @Volatile
     private var lostSinceLast = false
 
+    @Volatile
+    private var awaitingInternet = false
+
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             val previous = lastNetwork
@@ -29,7 +41,17 @@ internal class NetworkWatch(context: Context, private val onSwitched: () -> Unit
             lostSinceLast = false
             // The first call is the network we already had at registration. After a
             // loss, even the same network coming back needs a fresh connection.
-            if (lost || (previous != null && previous != network)) onSwitched()
+            if (lost || (previous != null && previous != network)) {
+                awaitingInternet = true
+                onSwitched()
+            }
+        }
+
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            if (network != lastNetwork || !awaitingInternet) return
+            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) return
+            awaitingInternet = false
+            onInternetBack()
         }
 
         override fun onLost(network: Network) {

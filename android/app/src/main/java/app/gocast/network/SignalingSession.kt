@@ -96,7 +96,7 @@ class SignalingSession(
         return try {
             ws.send(Frame.Text(helloJson(token)))
             val sent = SystemClock.elapsedRealtime()
-            val text = withTimeoutOrNull(8_000) { receiveText(ws) }
+            val text = withTimeoutOrNull(REMOTE_HELLO_MS) { receiveText(ws) }
             if (text == null) {
                 val reason = withTimeoutOrNull(500) { ws.closeReason.await() }
                 Log.i(
@@ -255,6 +255,11 @@ class SignalingSession(
         return true
     }
 
+    /** Sends straight on the open socket, outside the message loop (e.g. while stopping). */
+    suspend fun sendNow(text: String) {
+        session?.send(Frame.Text(text))
+    }
+
     suspend fun close() {
         session?.close()
         session = null
@@ -272,6 +277,8 @@ class SignalingSession(
         const val WRONG_CODE = "Wrong code or QR — open gocast on the PC and try again."
         const val PC_UNREACHABLE = "Can't reach your PC. Is GoCast open on it?"
         const val REMOTE_HANDSHAKE_MS = 12_000L
+        /** The PC answers through the relay in under 100 ms; a silent attempt is stuck. */
+        const val REMOTE_HELLO_MS = 3_000L
         const val PING_INTERVAL_MS = 30_000L
         const val ICE_REFRESH_MS = 3 * 60 * 60 * 1000L
     }
