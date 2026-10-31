@@ -47,10 +47,10 @@ data class SettingHelp(
 /** Plain-language help for every quality knob. */
 object SettingHelpCatalog {
     val resolutionScale = SettingHelp(
-        title = "Resolution scale",
+        title = "Picture size",
         body = "How big the picture is that gets sent to your PC.\n\n" +
             "100% means every pixel from your phone screen. " +
-            "Lower values shrink the picture first — it uses less Wi‑Fi and phone power, " +
+            "Lower values shrink the picture first. It uses less Wi‑Fi and phone power, " +
             "but text and fine detail look softer.\n\n" +
             "Tip: a slightly smaller, clear picture usually looks better than a huge " +
             "picture that your network can't keep up with.",
@@ -62,7 +62,7 @@ object SettingHelpCatalog {
     )
 
     val captureFps = SettingHelp(
-        title = "Capture FPS",
+        title = "Capture frame rate",
         body = "How many times per second your phone grabs a new frame of the screen.\n\n" +
             "Higher = smoother scrolling and video. Lower = cooler phone and less Wi‑Fi use.\n\n" +
             "60 feels great for games and video. 30 is plenty for reading apps or browsing.",
@@ -74,7 +74,7 @@ object SettingHelpCatalog {
     )
 
     val virtualDisplayDpi = SettingHelp(
-        title = "Virtual display DPI",
+        title = "Screen density",
         body = "Tells Android how “dense” the fake screen used for casting should feel.\n\n" +
             "Most people can leave this alone. Change it only if something on the cast " +
             "looks oddly zoomed or tiny compared to the real phone.",
@@ -85,19 +85,19 @@ object SettingHelpCatalog {
     )
 
     val preferredCodec = SettingHelp(
-        title = "Preferred codec",
+        title = "Preferred format",
         body = "A codec is how your phone compresses the screen picture before sending it over Wi‑Fi. " +
             "The right choice can keep the phone cool and the text sharp; the wrong one can heat the " +
-            "phone and make everything look soft — often more than changing bitrate a little.\n\n" +
-            "• H.264 — Best default. Uses a dedicated chip on most phones (cooler, sharper text). " +
+            "phone and make everything look soft, often more than changing bitrate a little.\n\n" +
+            "• H.264: Best default. Uses a dedicated chip on most phones (cooler, sharper text). " +
             "Almost every PC can play it.\n\n" +
-            "• H.265 — Same hardware idea, often clearer at the same Wi‑Fi use. " +
+            "• H.265: Same hardware idea, often clearer at the same Wi‑Fi use. " +
             "Your PC must support it or the cast may fail or fall back.\n\n" +
-            "• VP8 / VP9 — Often run in software on Android, so the phone works harder and " +
+            "• VP8 / VP9: Often run in software on Android, so the phone works harder and " +
             "screen text can look mushier. Fine as fallbacks if H.264/H.265 aren’t available.\n\n" +
-            "• AV1 — Rare on phones. Only pick this if you know both the phone and the PC support it.\n\n" +
+            "• AV1: Rare on phones. Only pick this if you know both the phone and the PC support it.\n\n" +
             "Tip: stick with H.264 unless you’re experimenting. A software codec hurts Phone and " +
-            "Clarity more than bumping max bitrate one step.\n\n" +
+            "Clarity more than bumping Max bitrate one step.\n\n" +
             "Changing this while casting briefly reconnects the video (no need to reshare).",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
@@ -112,7 +112,7 @@ object SettingHelpCatalog {
             "Higher = sharper picture when Wi‑Fi is strong. " +
             "Too high for your network causes lag and stuttering.\n\n" +
             "A good everyday starting point is around 8 Mbps on home Wi‑Fi. " +
-            "If the picture looks blocky, try raising this — or lowering resolution if Wi‑Fi is weak.",
+            "If the picture looks blocky, try raising this, or lowering resolution if Wi‑Fi is weak.",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
             CostChip(CostAxis.WIFI, CostWeight.HEAVY),
@@ -124,7 +124,7 @@ object SettingHelpCatalog {
         title = "Min bitrate",
         body = "The lowest quality floor the cast tries to stay above when the network dips.\n\n" +
             "Keeps things from suddenly turning into mush. " +
-            "Set to 0 if you want no floor. " +
+            "Pick No minimum if you want no floor. " +
             "Too high on a weak connection can cause freezes instead of a softer picture.",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.NOTICEABLE),
@@ -147,9 +147,9 @@ object SettingHelpCatalog {
     )
 
     val maxFramerate = SettingHelp(
-        title = "Max framerate",
+        title = "Max frame rate",
         body = "Cap on how many frames per second actually leave the phone.\n\n" +
-            "Pair it with Capture FPS. Use 60 for games and video, 30 for reading and browsing " +
+            "Pair it with Capture frame rate. Use 60 for games and video, 30 for reading and browsing " +
             "to save battery and Wi‑Fi.",
         costs = listOf(
             CostChip(CostAxis.MOTION, CostWeight.HEAVY),
@@ -159,10 +159,10 @@ object SettingHelpCatalog {
     )
 
     val scaleDown = SettingHelp(
-        title = "Scale resolution down by",
+        title = "Extra shrink",
         body = "An extra shrink applied while compressing the video.\n\n" +
             "2× means half the width and height at encode time. " +
-            "Prefer Resolution scale for the main size choice; use this only if you need " +
+            "Prefer Picture size for the main size choice; use this only if you need " +
             "another cut without changing capture size.",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
@@ -174,10 +174,10 @@ object SettingHelpCatalog {
     val degradation = SettingHelp(
         title = "When the connection struggles",
         body = "What to sacrifice first if Wi‑Fi or the phone can’t keep up:\n\n" +
-            "• Keep resolution — picture stays sharp; motion may hitch (great for text).\n" +
-            "• Keep framerate — motion stays smooth; picture may soften (great for games).\n" +
-            "• Balanced — a bit of both.\n" +
-            "• Disabled — don’t auto-adjust.",
+            "• Keep it sharp: picture stays sharp; motion may hitch (great for text).\n" +
+            "• Keep it smooth: motion stays smooth; picture may soften (great for games).\n" +
+            "• Balance both: a bit of each.\n" +
+            "• Do nothing: don’t auto-adjust.",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
             CostChip(CostAxis.MOTION, CostWeight.HEAVY),
@@ -186,7 +186,7 @@ object SettingHelpCatalog {
     )
 
     val networkPriority = SettingHelp(
-        title = "Network priority",
+        title = "Wi‑Fi priority",
         body = "Hints how important this cast’s traffic is on the network.\n\n" +
             "With only one stream, High is fine. This rarely changes what you see day to day.",
         costs = listOf(
@@ -196,9 +196,9 @@ object SettingHelpCatalog {
     )
 
     val bitratePriority = SettingHelp(
-        title = "Bitrate priority",
-        body = "A fine-tuning knob for how aggressively bitrate is claimed.\n\n" +
-            "Max bitrate matters much more. Leave this at 1.0 unless you’re experimenting.",
+        title = "Video priority",
+        body = "When Wi‑Fi is tight, how much of it goes to video instead of sound.\n\n" +
+            "Sound needs very little, so this rarely changes anything. Leave it at Normal.",
         costs = listOf(
             CostChip(CostAxis.WIFI, CostWeight.LIGHT),
             CostChip(CostAxis.CLARITY, CostWeight.LIGHT),
@@ -206,7 +206,7 @@ object SettingHelpCatalog {
     )
 
     val intelVp8 = SettingHelp(
-        title = "Intel VP8 encoder",
+        title = "VP8 hardware on Intel phones",
         body = "Optional encoder path used only with some codecs.\n\n" +
             "Safe to leave on. Screen casting usually prefers H.264 anyway.\n\n" +
             "Changing this while casting briefly rebuilds the encoder (no need to reshare).",
@@ -217,7 +217,7 @@ object SettingHelpCatalog {
     )
 
     val h264High = SettingHelp(
-        title = "H.264 high profile",
+        title = "Better H.264 compression",
         body = "Lets the phone’s H.264 encoder use a richer compression mode.\n\n" +
             "Usually means a clearer picture at the same Wi‑Fi budget. " +
             "Turn off only if casting fails on a quirky device.\n\n" +

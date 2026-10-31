@@ -6,7 +6,8 @@ import javax.jmdns.JmDNS
 import javax.jmdns.ServiceInfo
 
 /**
- * Advertises this GoCast session on the LAN via mDNS (`_gocast._tcp`).
+ * Advertises this GoCast session on the LAN via mDNS (`_gocast._tcp`) and
+ * to nearby phones via a Bluetooth LE beacon.
  */
 class GocastAdvertiser {
     companion object {
@@ -14,15 +15,25 @@ class GocastAdvertiser {
     }
 
     private var jmdns: JmDNS? = null
+    private val beacon = BluetoothBeacon()
 
     /**
      * @param host Prefer the same address shown in the QR. When null, resolves again.
+     * @param roomId The relay room, broadcast over Bluetooth so nearby phones join through it.
      */
-    fun start(port: Int, instanceId: String, displayName: String, host: String? = null) {
+    fun start(
+        port: Int,
+        instanceId: String,
+        displayName: String,
+        host: String? = null,
+        roomId: String? = null,
+    ) {
         stop()
         val lanIp = host
             ?.takeIf { it.isNotBlank() && it != "127.0.0.1" }
             ?: LocalIpResolver.resolve()
+        // Independent of mDNS: a Bluetooth failure must never block LAN discovery.
+        runCatching { beacon.start(lanIp, port, displayName, roomId) }
         val addr = runCatching { InetAddress.getByName(lanIp) }.getOrNull()
             ?.takeUnless { it.isLoopbackAddress }
         val dns = if (addr != null) {
@@ -37,16 +48,20 @@ class GocastAdvertiser {
             port,
             0,
             0,
-            mapOf(
-                "id" to instanceId,
-                "name" to displayName,
-            ),
+            buildMap {
+                put("id", instanceId)
+                put("name", displayName)
+                // Lets Find on Wi-Fi join through the relay too, so a network that
+                // blocks phone-to-PC traffic (guest/isolated Wi-Fi) still works.
+                roomId?.let { put("room", it) }
+            },
         )
         dns.registerService(info)
         jmdns = dns
     }
 
     fun stop() {
+        runCatching { beacon.stop() }
         jmdns?.unregisterAllServices()
         jmdns?.close()
         jmdns = null

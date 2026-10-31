@@ -84,9 +84,9 @@ data class CastQualitySettings(
         )
 
         val ResolutionScaleOptions = listOf(
-            1.0f to "Native (100%)",
+            1.0f to "Full (100%)",
             0.75f to "75%",
-            0.5f to "50% (≈720p on FHD)",
+            0.5f to "Half (50%)",
             0.33f to "33%",
             0.25f to "25%",
         )
@@ -102,11 +102,11 @@ data class CastQualitySettings(
         val StartBitrateMbpsOptions = listOf(1, 2, 4, 6, 8, 12)
 
         val ScaleDownOptions = listOf(
-            1.0 to "1× (none)",
-            1.5 to "1.5×",
-            2.0 to "2×",
-            3.0 to "3×",
-            4.0 to "4×",
+            1.0 to "None",
+            1.5 to "1.5× smaller",
+            2.0 to "2× smaller",
+            3.0 to "3× smaller",
+            4.0 to "4× smaller",
         )
     }
 }

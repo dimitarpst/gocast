@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -24,6 +26,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
@@ -31,7 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.gocast.R
 
-enum class ConnectionActionSymbol { Qr, Wifi }
+enum class ConnectionActionSymbol { Qr, Wifi, Bluetooth }
 
 /** A single, clearly labelled tap target for an existing connection action. */
 @Composable
@@ -41,6 +44,8 @@ fun ConnectionActionCard(
     symbol: ConnectionActionSymbol,
     prominent: Boolean,
     onClick: () -> Unit,
+    /** Notification-style count on the symbol, e.g. PCs already found. Hidden at 0. */
+    badgeCount: Int = 0,
 ) {
     val foreground = if (prominent) {
         MaterialTheme.colorScheme.onPrimary
@@ -65,23 +70,12 @@ fun ConnectionActionCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(foreground.copy(alpha = 0.1f), CircleShape),
-                contentAlignment = Alignment.Center,
+            BadgedBox(
+                badge = {
+                    if (badgeCount > 0) Badge { Text(badgeCount.toString()) }
+                },
             ) {
-                when (symbol) {
-                    ConnectionActionSymbol.Qr -> Icon(
-                        painter = painterResource(R.drawable.ic_qr_code),
-                        contentDescription = null,
-                        tint = foreground,
-                        modifier = Modifier.size(26.dp),
-                    )
-                    ConnectionActionSymbol.Wifi -> Canvas(Modifier.size(26.dp)) {
-                        drawWifiSymbol(foreground)
-                    }
-                }
+                SymbolCircle(symbol, foreground)
             }
             Column(
                 modifier = Modifier.weight(1f),
@@ -111,15 +105,59 @@ fun ConnectionActionCard(
     }
 }
 
-private fun DrawScope.drawWifiSymbol(color: Color) {
+@Composable
+private fun SymbolCircle(symbol: ConnectionActionSymbol, foreground: Color) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .background(foreground.copy(alpha = 0.1f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (symbol) {
+            ConnectionActionSymbol.Qr -> Icon(
+                painter = painterResource(R.drawable.ic_qr_code),
+                contentDescription = null,
+                tint = foreground,
+                modifier = Modifier.size(26.dp),
+            )
+            ConnectionActionSymbol.Wifi -> Canvas(Modifier.size(26.dp)) {
+                drawWifiSymbol(foreground)
+            }
+            ConnectionActionSymbol.Bluetooth -> Canvas(Modifier.size(26.dp)) {
+                drawBluetoothSymbol(foreground)
+            }
+        }
+    }
+}
+
+/** The Bluetooth rune: a spine, two arrow-heads and the crossing strokes. */
+internal fun DrawScope.drawBluetoothSymbol(color: Color) {
+    val unit = size.minDimension / 24f
+    val rune = Path().apply {
+        moveTo(6.5f * unit, 7f * unit)
+        lineTo(17f * unit, 16.5f * unit)
+        lineTo(12f * unit, 21.5f * unit)
+        lineTo(12f * unit, 2.5f * unit)
+        lineTo(17f * unit, 7.5f * unit)
+        lineTo(6.5f * unit, 17f * unit)
+    }
+    drawPath(
+        rune,
+        color,
+        style = Stroke(width = 1.8f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round),
+    )
+}
+
+/** The approved Wi‑Fi symbol. [bandAlpha] gets 0 for the inner band up to 2 for the outer one. */
+internal fun DrawScope.drawWifiSymbol(color: Color, bandAlpha: (Int) -> Float = { 1f }) {
     val unit = size.minDimension / 24f
     val line = Stroke(width = 1.8f * unit, cap = StrokeCap.Round)
     val source = Offset(12f * unit, 19f * unit)
     // Concentric bands radiate from the dot, with equal spacing between them.
-    listOf(14f, 9.5f, 5f).forEach { radius ->
+    listOf(14f, 9.5f, 5f).forEachIndexed { index, radius ->
         val radiusPx = radius * unit
         drawArc(
-            color = color,
+            color = color.copy(alpha = color.alpha * bandAlpha(2 - index)),
             startAngle = 225f,
             sweepAngle = 90f,
             useCenter = false,

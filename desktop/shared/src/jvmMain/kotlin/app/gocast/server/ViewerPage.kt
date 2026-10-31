@@ -1,7 +1,8 @@
 package app.gocast.server
 
 object ViewerPage {
-    fun html(token: String): String = """
+    /** @param iceServersJson RTCIceServer list from [app.gocast.protocol.RemoteSignaling.encodeIceServers]. */
+    fun html(token: String, iceServersJson: String = "[]"): String = """
 <!DOCTYPE html>
 <html lang="en" style="background:#12141A;color-scheme:dark">
 <head>
@@ -305,6 +306,8 @@ object ViewerPage {
   </div>
   <script>
     const TOKEN = ${token.toJsonString()};
+    // STUN/TURN from the signaling Worker; refreshed before each offer (credentials expire).
+    const INITIAL_ICE_SERVERS = $iceServersJson;
     const statusEl = document.getElementById('status');
     const pausedEl = document.getElementById('paused');
     const video = document.getElementById('video');
@@ -486,8 +489,109 @@ object ViewerPage {
     });
 
     let pc = null;
+    let linkType = null;
+    let linkTimer = null;
 
-    function wirePeerConnection() {
+    // Mirrors LinkClassifier in protocol/: private peer address = LAN, relay = relayed.
+    function isLocalAddress(address) {
+      if (!address) return false;
+      const value = String(address).trim().replace(/^\[|\]$/g, '').toLowerCase();
+      if (value.endsWith('.local')) return true;
+      const v4 = value.split('.');
+      if (v4.length === 4 && v4.every((p) => /^\d{1,3}$/.test(p) && Number(p) <= 255)) {
+        const a = Number(v4[0]);
+        const b = Number(v4[1]);
+        return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) ||
+          (a === 192 && b === 168) || (a === 169 && b === 254);
+      }
+      if (!value.includes(':')) return false;
+      const v6 = value.split('%')[0];
+      return v6 === '::1' || /^f[cd]/.test(v6) || /^fe[89ab]/.test(v6);
+    }
+
+    function classifyLink(local, remote) {
+      if (!local && !remote) return null;
+      const localType = local && local.candidateType;
+      const remoteType = remote && remote.candidateType;
+      if (localType === 'relay' || remoteType === 'relay') return 'Relayed';
+      const remoteAddress = remote && (remote.address || remote.ip);
+      if (remoteAddress) return isLocalAddress(remoteAddress) ? 'Direct (LAN)' : 'Direct (internet)';
+      const localAddress = local && (local.address || local.ip);
+      return remoteType === 'host' && isLocalAddress(localAddress) ? 'Direct (LAN)' : 'Direct (internet)';
+    }
+
+    // The link type is logged (console + PC log), not shown: users only need "Casting".
+    function castingStatus() {
+      return 'Casting';
+    }
+
+    async function refreshLinkType() {
+      if (!pc || pc.connectionState !== 'connected') return;
+      let stats;
+      try { stats = await pc.getStats(); } catch (_) { return; }
+      let pair = null;
+      stats.forEach((report) => {
+        if (report.type === 'transport' && report.selectedCandidatePairId) {
+          pair = stats.get(report.selectedCandidatePairId) || pair;
+        }
+      });
+      if (!pair) {
+        stats.forEach((report) => {
+          if (report.type === 'candidate-pair' && report.nominated && report.state === 'succeeded') pair = report;
+        });
+      }
+      if (!pair) return;
+      const next = classifyLink(stats.get(pair.localCandidateId), stats.get(pair.remoteCandidateId));
+      if (!next || next === linkType) return;
+      linkType = next;
+      console.log('gocast link: ' + next);
+      fetch('/__gocast/link-type', { method: 'POST', body: next, cache: 'no-store' }).catch(() => {});
+      if (!streamPaused && (videoStream || audioStream)) setStatus(castingStatus());
+    }
+
+    function stopLinkWatch() {
+      clearInterval(linkTimer);
+      linkTimer = null;
+      linkType = null;
+    }
+
+    async function currentIceServers() {
+      try {
+        const response = await fetch('/__gocast/ice-servers', { cache: 'no-store' });
+        const servers = await response.json();
+        if (Array.isArray(servers) && servers.length > 0) return servers;
+      } catch (_) {}
+      return INITIAL_ICE_SERVERS;
+    }
+
+    // A dead video link (the phone switched networks, a relay hiccup) is rebuilt by
+    // asking the phone for a fresh offer, so nobody has to press Retry. Repeats
+    // until a new connection is on its way.
+    let recoverTimer = null;
+    function scheduleRecovery(delayMs) {
+      if (recoverTimer) return;
+      recoverTimer = setTimeout(() => {
+        recoverTimer = null;
+        if (streamPaused || !pc) return;
+        const state = pc.connectionState;
+        if (state === 'new' || state === 'connecting' || state === 'connected') return;
+        if (ws.readyState === WebSocket.OPEN) {
+          console.log('gocast: video link ' + state + ', asking the phone for a fresh offer');
+          ws.send(JSON.stringify({ type: 'viewer-ready' }));
+        }
+        scheduleRecovery(RECOVER_REPEAT_MS);
+      }, delayMs);
+    }
+    function cancelRecovery() {
+      clearTimeout(recoverTimer);
+      recoverTimer = null;
+    }
+    const RECOVER_REPEAT_MS = 6000;
+    // "disconnected" often heals by itself within a few seconds; "failed" never does.
+    const RECOVER_AFTER_DISCONNECT_MS = 4000;
+
+    function wirePeerConnection(iceServers) {
+      cancelRecovery();
       if (pc) {
         try { pc.close(); } catch (_) {}
       }
@@ -495,7 +599,8 @@ object ViewerPage {
       audioStream = null;
       video.srcObject = null;
       audio.srcObject = null;
-      pc = new RTCPeerConnection({ iceServers: [] });
+      stopLinkWatch();
+      pc = new RTCPeerConnection({ iceServers });
       pc.ontrack = (event) => {
         const kind = event.track.kind;
         if (kind === 'video') {
@@ -521,18 +626,25 @@ object ViewerPage {
         const a = audioStream ? audioStream.getTracks().length : 0;
         if (v > 0 || a > 0) {
           setStreamPaused(false);
-          setStatus('Casting');
+          setStatus(castingStatus());
         }
       };
       pc.onconnectionstatechange = () => {
         if (streamPaused) return;
         const state = pc.connectionState;
         if (state === 'connected') {
+          cancelRecovery();
           setStatus('Connected');
+          // The pair can change (relay first, direct later), so keep looking.
+          refreshLinkType();
+          clearInterval(linkTimer);
+          linkTimer = setInterval(refreshLinkType, 5000);
         } else if (state === 'connecting') {
           setStatus('Connecting…');
         } else if (state === 'failed' || state === 'closed' || state === 'disconnected') {
-          setStatus('Connection lost — waiting for phone…');
+          setStatus('Connection lost. Waiting for phone…');
+          if (state === 'failed') scheduleRecovery(0);
+          if (state === 'disconnected') scheduleRecovery(RECOVER_AFTER_DISCONNECT_MS);
         }
       };
       pc.onicecandidate = (event) => {
@@ -573,7 +685,7 @@ object ViewerPage {
       }
       if (msg.type === 'offer' && msg.sdp) {
         setStreamPaused(false);
-        wirePeerConnection();
+        wirePeerConnection(await currentIceServers());
         await pc.setRemoteDescription({ type: 'offer', sdp: msg.sdp });
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);

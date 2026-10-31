@@ -50,7 +50,7 @@ object QualityRecommender {
                     if (weakCpu) bits += "fewer CPU cores"
                     if (slowWifi) bits += "slower Wi‑Fi"
                     if (bits.isNotEmpty()) {
-                        append(" — ")
+                        append(": ")
                         append(bits.joinToString(", "))
                     }
                     append(".")
@@ -58,11 +58,11 @@ object QualityRecommender {
             )
             highRes && fastWifi && ramMb >= 6144 && cores >= 6 -> QualityRecommendation(
                 profile = CastQualityProfile.BuiltIns.first { it.id == CastQualityProfile.ID_SHARP },
-                reason = "Sharp — your phone and Wi‑Fi look strong enough for maximum clarity.",
+                reason = "Sharp: your phone and Wi‑Fi look strong enough for maximum clarity.",
             )
             else -> QualityRecommendation(
                 profile = CastQualityProfile.BuiltIns.first { it.id == CastQualityProfile.ID_BALANCED },
-                reason = "Balanced — a solid all-rounder for everyday casting.",
+                reason = "Balanced: a solid all-rounder for everyday casting.",
             )
         }
     }

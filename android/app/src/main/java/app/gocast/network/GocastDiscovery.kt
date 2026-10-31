@@ -5,6 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import app.gocast.domain.DiscoveredHost
+import app.gocast.protocol.RoomId
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -59,6 +60,9 @@ class GocastDiscovery(context: Context) {
                             host = hostAddress,
                             port = serviceInfo.port,
                             instanceId = instanceId,
+                            // PCs from 1.0.4 advertise their relay room; joining through it
+                            // also works where the Wi-Fi blocks phone-to-PC traffic.
+                            roomId = attrs.txt("room")?.takeIf { RoomId.isValid(it) },
                         )
                         emitHosts()
                     }

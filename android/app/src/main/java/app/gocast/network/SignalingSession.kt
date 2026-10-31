@@ -1,82 +1,229 @@
 package app.gocast.network
 
+import android.os.SystemClock
+import android.util.Log
 import app.gocast.protocol.HelloMessage
 import app.gocast.protocol.HelloOkMessage
 import app.gocast.protocol.HostEndpoint
+import app.gocast.protocol.IceServer
+import app.gocast.protocol.JoinParams
+import app.gocast.protocol.RemoteControl
+import app.gocast.protocol.RemoteSignaling
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.websocket.Frame
-import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.net.UnknownHostException
 
 class SignalingSession(
     private val httpClient: HttpClient = GocastHttpClient.instance,
     private val json: Json = Json { ignoreUnknownKeys = true },
+    private val remoteBaseUrl: String = RemoteSignaling.BASE_URL,
+    /** False on mobile data: the LAN fallback after the relay cannot answer there. */
+    private val canTryLan: () -> Boolean = { true },
 ) {
-    private var session: WebSocketSession? = null
+    enum class Transport { Remote, Lan }
+
+    private var session: DefaultClientWebSocketSession? = null
 
     val isOpen: Boolean
         get() = session != null
 
-    suspend fun open(host: String, port: Int, token: String): HelloResult {
+    /** Which path the open socket uses; null while closed. */
+    @Volatile
+    var transport: Transport? = null
+        private set
+
+    /**
+     * The PC's room on the signaling Worker first (works from any network, no
+     * inbound port), then the LAN socket on 8765 as before.
+     */
+    suspend fun open(params: JoinParams): HelloResult {
         close()
-        return try {
-            val ws = withTimeoutOrNull(8_000) {
-                httpClient.webSocketSession("ws://${HostEndpoint.authority(host, port)}/ws")
-            } ?: return HelloResult.Failed(LanHealthProbe.explainFailure(host, port, null)).also {
-                close()
-            }
-            session = ws
-            ws.send(
-                Frame.Text(
-                    json.encodeToString(HelloMessage(type = "hello", token = token, role = "phone")),
-                ),
-            )
-            val frame = withTimeoutOrNull(8_000) {
-                ws.incoming.receive() as? Frame.Text
-            } ?: return HelloResult.Failed("Timed out waiting for PC").also { close() }
-            val text = frame.readText()
-            when {
-                text == "ok" -> HelloResult.Ok()
-                else -> {
-                    val ok = runCatching { json.decodeFromString<HelloOkMessage>(text) }.getOrNull()
-                    if (ok?.type == "ok") {
-                        HelloResult.Ok(
-                            trustToken = ok.trustToken,
-                            instanceId = ok.instanceId,
-                            displayName = ok.displayName,
-                        )
-                    } else {
-                        close()
-                        HelloResult.Failed("Wrong code or QR — open gocast on the PC and try again.")
+        // Credentials belong to one session; a LAN-only join must not reuse them.
+        PhoneIceServers.update(IceServer.STUN_ONLY)
+        val roomId = params.roomId
+        var triedRemote = false
+        if (roomId != null) {
+            triedRemote = true
+            when (val remote = openRemote(roomId, params.token)) {
+                is RemoteAttempt.Ok -> return remote.result
+                RemoteAttempt.Rejected -> return HelloResult.Failed(WRONG_CODE)
+                RemoteAttempt.NoInternet -> {
+                    // A Wi-Fi without internet can still reach a PC on it directly.
+                    if (canTryLan()) {
+                        val lan = openLan(params.host, params.port, params.token, triedRemote = true)
+                        if (lan is HelloResult.Ok) return lan
                     }
+                    return HelloResult.Failed(NO_INTERNET)
+                }
+                RemoteAttempt.Unavailable -> {
+                    if (!canTryLan()) {
+                        Log.i(TAG, "Remote signaling unavailable; not on Wi-Fi, so no LAN fallback")
+                        return HelloResult.Failed(PC_UNREACHABLE)
+                    }
+                    Log.i(TAG, "Remote signaling unavailable, trying Wi-Fi")
+                }
+            }
+        }
+        return openLan(params.host, params.port, params.token, triedRemote)
+    }
+
+    private sealed interface RemoteAttempt {
+        data class Ok(val result: HelloResult.Ok) : RemoteAttempt
+        /** The PC said no (wrong code or revoked trust); the LAN would say the same. */
+        data object Rejected : RemoteAttempt
+        /** Worker unreachable or PC not connected to its room. */
+        data object Unavailable : RemoteAttempt
+        /** The relay's own name did not resolve: this phone has no working internet. */
+        data object NoInternet : RemoteAttempt
+    }
+
+    private suspend fun openRemote(roomId: String, token: String): RemoteAttempt {
+        val url = RemoteSignaling.roomUrl(roomId, RemoteSignaling.ROLE_PHONE, remoteBaseUrl)
+        val started = SystemClock.elapsedRealtime()
+        val ws = try {
+            // HTTP 503 (PC offline) surfaces as a handshake exception here.
+            withTimeoutOrNull(REMOTE_HANDSHAKE_MS) { httpClient.webSocketSession(url) }.also {
+                if (it == null) Log.i(TAG, "Relay: no connection after $REMOTE_HANDSHAKE_MS ms")
+            }
+        } catch (e: Exception) {
+            Log.i(TAG, "Remote signaling: ${e.message ?: e.javaClass.simpleName}")
+            // 31 Oct: the phone said "can't reach the PC" while it simply had no internet.
+            if (generateSequence<Throwable>(e) { it.cause }.any { it is UnknownHostException }) {
+                return RemoteAttempt.NoInternet
+            }
+            null
+        } ?: return RemoteAttempt.Unavailable
+        Log.i(TAG, "Relay: connected in ${SystemClock.elapsedRealtime() - started} ms")
+        session = ws
+        transport = Transport.Remote
+        return try {
+            ws.send(Frame.Text(helloJson(token)))
+            val sent = SystemClock.elapsedRealtime()
+            val text = withTimeoutOrNull(REMOTE_HELLO_MS) { receiveText(ws) }
+            if (text == null) {
+                val reason = withTimeoutOrNull(500) { ws.closeReason.await() }
+                Log.i(
+                    TAG,
+                    "Relay: no reply to hello after ${SystemClock.elapsedRealtime() - sent} ms" +
+                        (reason?.let { " (closed ${it.code}: ${it.message})" } ?: ""),
+                )
+                close()
+                if (reason?.code == RemoteSignaling.CLOSE_REJECTED) RemoteAttempt.Rejected else RemoteAttempt.Unavailable
+            } else {
+                val ok = parseOk(text)
+                if (ok == null) {
+                    close()
+                    RemoteAttempt.Rejected
+                } else {
+                    // Reply handled in the message loop; STUN-only until then.
+                    ws.send(Frame.Text(RemoteSignaling.GET_ICE_SERVERS))
+                    Log.i(TAG, "Connected through the signaling room")
+                    RemoteAttempt.Ok(ok)
                 }
             }
         } catch (e: Exception) {
+            Log.i(TAG, "Remote signaling failed: ${e.message ?: e.javaClass.simpleName}")
             close()
-            HelloResult.Failed(LanHealthProbe.explainFailure(host, port, e))
+            RemoteAttempt.Unavailable
         }
+    }
+
+    private suspend fun openLan(host: String, port: Int, token: String, triedRemote: Boolean): HelloResult {
+        return try {
+            val ws = withTimeoutOrNull(8_000) {
+                httpClient.webSocketSession("ws://${HostEndpoint.authority(host, port)}/ws")
+            } ?: return HelloResult.Failed(LanHealthProbe.explainFailure(host, port, null, triedRemote)).also {
+                close()
+            }
+            session = ws
+            transport = Transport.Lan
+            ws.send(Frame.Text(helloJson(token)))
+            val text = withTimeoutOrNull(8_000) { receiveText(ws) }
+                ?: return HelloResult.Failed("Timed out waiting for PC").also { close() }
+            val ok = parseOk(text)
+            if (ok == null) {
+                close()
+                HelloResult.Failed(WRONG_CODE)
+            } else {
+                Log.i(TAG, "Connected over Wi-Fi")
+                ok
+            }
+        } catch (e: Exception) {
+            close()
+            HelloResult.Failed(LanHealthProbe.explainFailure(host, port, e, triedRemote))
+        }
+    }
+
+    private fun helloJson(token: String): String =
+        json.encodeToString(HelloMessage(type = "hello", token = token, role = "phone"))
+
+    /** Null when the socket closes first. */
+    private suspend fun receiveText(ws: DefaultClientWebSocketSession): String? =
+        runCatching { (ws.incoming.receive() as? Frame.Text)?.readText() }.getOrNull()
+
+    private fun parseOk(text: String): HelloResult.Ok? {
+        if (text == "ok") return HelloResult.Ok()
+        val ok = runCatching { json.decodeFromString<HelloOkMessage>(text) }.getOrNull()
+        if (ok?.type != "ok") return null
+        return HelloResult.Ok(
+            trustToken = ok.trustToken,
+            instanceId = ok.instanceId,
+            displayName = ok.displayName,
+        )
     }
 
     /**
      * Keeps the socket alive until it drops or the PC ends the session.
+     * @param onReady called once outgoing messages are being forwarded. Report
+     *   Connected only then: SignalingBridge drops messages nobody collects yet,
+     *   and the publisher announces itself the moment it sees Connected.
      * @return true if the PC sent session-ended (do not auto-reconnect).
      */
-    suspend fun runMessageLoop(): Boolean {
+    suspend fun runMessageLoop(onReady: () -> Unit = {}): Boolean {
         val ws = session ?: return false
+        val remote = transport == Transport.Remote
         var endedByServer = false
         try {
             coroutineScope {
-                val outgoingJob = launch {
+                // Undispatched: subscribed to the bridge before onReady runs.
+                val outgoingJob = launch(start = CoroutineStart.UNDISPATCHED) {
                     SignalingBridge.outgoing.collect { text ->
                         ws.send(Frame.Text(text))
                     }
+                }
+                onReady()
+                // The Worker answers pings without waking the room; credentials expire after 4 h.
+                val keepAlive = if (remote) {
+                    launch {
+                        while (true) {
+                            delay(PING_INTERVAL_MS)
+                            ws.send(Frame.Text(RemoteSignaling.PING))
+                        }
+                    }
+                } else {
+                    null
+                }
+                val iceRefresh = if (remote) {
+                    launch {
+                        while (true) {
+                            delay(ICE_REFRESH_MS)
+                            ws.send(Frame.Text(RemoteSignaling.GET_ICE_SERVERS))
+                        }
+                    }
+                } else {
+                    null
                 }
                 try {
                     for (frame in ws.incoming) {
@@ -86,27 +233,69 @@ class SignalingSession(
                                 endedByServer = true
                                 break
                             }
+                            if (remote && handleControl(text)) continue
                             SignalingBridge.receive(text)
                         }
                     }
                 } finally {
                     outgoingJob.cancel()
+                    keepAlive?.cancel()
+                    iceRefresh?.cancel()
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Switching Wi-Fi ↔ mobile data kills the socket mid-read ("Software caused
+            // connection abort"). That is a drop to reconnect from, not a crash.
+            Log.i(TAG, "Signaling socket dropped: ${e.message ?: e.javaClass.simpleName}")
         } finally {
-            close()
+            runCatching { close() }
         }
         return endedByServer
+    }
+
+    /** Worker control messages never reach the publisher. */
+    private fun handleControl(text: String): Boolean {
+        when (val control = RemoteSignaling.parseControl(text)) {
+            is RemoteControl.IceServers -> {
+                PhoneIceServers.update(control.servers)
+                val relay = control.servers.any { server -> server.urls.any { it.startsWith("turn") } }
+                Log.i(TAG, "ICE servers from room: ${if (relay) "STUN+TURN" else "STUN only"}")
+            }
+            // Relay status goes to the PC only; ignore it if it ever arrives here.
+            is RemoteControl.PhoneJoined, is RemoteControl.PhoneLeft, is RemoteControl.RelayStatus, RemoteControl.Pong -> Unit
+            null -> return false
+        }
+        return true
+    }
+
+    /** Sends straight on the open socket, outside the message loop (e.g. while stopping). */
+    suspend fun sendNow(text: String) {
+        session?.send(Frame.Text(text))
     }
 
     suspend fun close() {
         session?.close()
         session = null
+        transport = null
     }
 
     private fun isSessionEnded(text: String): Boolean {
         return runCatching {
             json.decodeFromString<SignalingMessage>(text).type == "session-ended"
         }.getOrDefault(false)
+    }
+
+    private companion object {
+        const val TAG = "SignalingSession"
+        const val WRONG_CODE = "Wrong code or QR. Open gocast on the PC and try again."
+        const val PC_UNREACHABLE = "Can't reach your PC. Is gocast open on it?"
+        const val NO_INTERNET = "This phone has no internet. Turn on Wi-Fi or mobile data."
+        const val REMOTE_HANDSHAKE_MS = 12_000L
+        /** The PC answers through the relay in under 100 ms; a silent attempt is stuck. */
+        const val REMOTE_HELLO_MS = 3_000L
+        const val PING_INTERVAL_MS = 30_000L
+        const val ICE_REFRESH_MS = 3 * 60 * 60 * 1000L
     }
 }

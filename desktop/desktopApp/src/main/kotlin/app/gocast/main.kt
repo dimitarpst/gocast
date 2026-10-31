@@ -24,6 +24,7 @@ import app.gocast.platform.GocastShutdown
 import app.gocast.platform.WebView2Support
 import app.gocast.platform.WindowsLanAccess
 import app.gocast.server.KtorGocastServer
+import app.gocast.server.RemoteSignalingClient
 import app.gocast.server.SessionGuard
 import app.gocast.trust.DesktopIdentityStore
 import kotlinx.coroutines.runBlocking
@@ -44,6 +45,14 @@ fun main() {
     val identityStore = DesktopIdentityStore()
     val server = KtorGocastServer(identityStore)
     val advertiser = GocastAdvertiser()
+    val identity = identityStore.loadOrCreateIdentity()
+    // Owner adds this id to the Worker's ALLOWED_ROOMS to permit relay (see cloud/signal/README.md).
+    println("Remote room id: ${identity.roomId}")
+    val remote = RemoteSignalingClient(
+        roomId = checkNotNull(identity.roomId),
+        hostKey = checkNotNull(identity.hostKey),
+        identityStore = identityStore,
+    )
     val session = runBlocking {
         val created = JvmSessionFactory(identityStore).create(8765)
         SessionGuard.expectedToken = created.token
@@ -52,7 +61,8 @@ fun main() {
         SessionGuard.displayName = created.displayName
         SessionGuard.replaceTrusted(identityStore.loadTrustedTokens())
         server.start(8765)
-        advertiser.start(8765, created.instanceId, created.displayName, created.host)
+        advertiser.start(8765, created.instanceId, created.displayName, created.host, created.roomId)
+        remote.start()
         created
     }
 
@@ -65,7 +75,7 @@ fun main() {
 
         Window(
             onCloseRequest = {
-                GocastShutdown.beginBackground(advertiser, server)
+                GocastShutdown.beginBackground(advertiser, server, remote)
                 exitApplication()
             },
             title = DevBuildLabel?.let { "gocast Dev · $it" } ?: "gocast",

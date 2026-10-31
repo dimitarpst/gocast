@@ -116,7 +116,12 @@ fun PairingScreen(
                 )
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RelayControl()
             DesktopUpdateControl(canInstall = canInstallUpdate)
         }
     }

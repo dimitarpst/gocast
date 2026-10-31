@@ -47,6 +47,7 @@ fun GocastRoot(
                     instanceId = liveSession.instanceId,
                     displayName = displayName,
                     host = host,
+                    roomId = liveSession.roomId,
                 )
             }
         }
@@ -68,6 +69,7 @@ fun GocastRoot(
                         instanceId = liveSession.instanceId,
                         displayName = updated.displayName,
                         host = liveSession.host,
+                        roomId = liveSession.roomId,
                     )
                 },
                 isFullscreen = isFullscreen,

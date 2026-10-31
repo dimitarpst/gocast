@@ -22,6 +22,14 @@ class JoinSessionCompatibilityTest {
         )
     }
 
+    @Test
+    fun qrCarriesTheRemoteRoomWhenThePcHasOne() {
+        assertEquals(
+            "https://cast.govrse.app/join?a=192.168.1.20:8765&t=123456&r=AbCdEfGhIjKlMnOpQrStUv",
+            session("192.168.1.20").copy(roomId = "AbCdEfGhIjKlMnOpQrStUv").joinUrl,
+        )
+    }
+
     private fun session(host: String) = JoinSession(
         host = host,
         port = 8765,

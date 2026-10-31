@@ -58,6 +58,42 @@ $wixBin = $wixDirectories | Where-Object {
 } | Select-Object -First 1
 if (!$wixBin) { throw 'WiX Toolset 3.x (candle/light) is required by the current jpackage build.' }
 
+# Published 1.0.2's own uninstall always fails: its GocastCleanup action names
+# Directory "SystemFolder", which that MSI never defines (error 2727). Windows runs
+# it whenever 1.0.2 is removed, so 1.0.2 could be neither upgraded nor uninstalled
+# (seen 31 Oct). The setup first applies a repaired copy as a minor update, which
+# replaces the cached installer; removing 1.0.2 then works. Files are not touched.
+$legacyProductCode = '{6DA12634-47A4-3EFC-BB37-94181922EDAC}'
+function New-Legacy102RepairMsi {
+    param([string]$Destination)
+    $cache = Join-Path $workspace '.local-run\legacy'
+    New-Item -ItemType Directory -Force -Path $cache | Out-Null
+    $original = Join-Path $cache 'gocast-1.0.2.msi'
+    if (!(Test-Path -LiteralPath $original)) {
+        $url = "https://github.com/$($properties.repository)/releases/download/v1.0.2/gocast-1.0.2.msi"
+        Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $original
+    }
+    Add-Type -Path (Join-Path $wixBin 'Microsoft.Deployment.WindowsInstaller.dll')
+    Copy-Item -LiteralPath $original -Destination $Destination -Force
+    $db = New-Object Microsoft.Deployment.WindowsInstaller.Database($Destination, [Microsoft.Deployment.WindowsInstaller.DatabaseOpenMode]::Direct)
+    try {
+        $productCode = $db.ExecuteScalar("SELECT ``Value`` FROM ``Property`` WHERE ``Property``='ProductCode'")
+        if ($productCode -ne $legacyProductCode) { throw "Downloaded 1.0.2 MSI has product code $productCode, expected $legacyProductCode." }
+        $db.Execute("DELETE FROM ``InstallExecuteSequence`` WHERE ``Action``='GocastCleanup'")
+        # A higher version with the same ProductCode makes Burn apply it as a minor
+        # update (REINSTALL=ALL REINSTALLMODE=vomus): it recaches, files stay as they are.
+        $db.Execute("UPDATE ``Property`` SET ``Value``='1.0.2.1' WHERE ``Property``='ProductVersion'")
+        # The installed files are already there, so drop the payload to keep setup small.
+        foreach ($cabinet in $db.ExecuteStringQuery("SELECT ``Cabinet`` FROM ``Media``")) {
+            if ($cabinet -and $cabinet.StartsWith('#')) {
+                $db.Execute("DELETE FROM ``_Streams`` WHERE ``Name``='$($cabinet.Substring(1))'")
+            }
+        }
+        $db.SummaryInfo.RevisionNumber = '{' + [guid]::NewGuid().ToString().ToUpperInvariant() + '}'
+        $db.Commit()
+    } finally { $db.Dispose() }
+}
+
 $output = Join-Path $workspace ('.local-run\packages\' + $version + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 New-Item -ItemType Directory -Path $output | Out-Null
 $savedJavaHome = $env:JAVA_HOME
@@ -68,7 +104,9 @@ try {
     $desktop = Join-Path $workspace 'desktop'
     $task = if ($Release) { ':desktopApp:packageReleaseMsi' } else { ':desktopApp:packageMsi' }
     Push-Location -LiteralPath $desktop
-    try { Invoke-PackageTool (Join-Path $desktop 'gradlew.bat') @($task, '--console=plain') }
+    # Like dev.ps1: the Compose packaging tasks are not configuration-cache safe, and the
+    # cache check fails the build even after the MSI was written.
+    try { Invoke-PackageTool (Join-Path $desktop 'gradlew.bat') @($task, '--console=plain', '--no-configuration-cache') }
     finally { Pop-Location }
 
     $variant = if ($Release) { 'main-release' } else { 'main' }
@@ -92,10 +130,13 @@ try {
     $theme = Join-Path $output 'GoCastTheme.xml'
     $themeText = [IO.File]::ReadAllText((Join-Path $package 'GoCastTheme.xml')).Replace('{{VERSION}}', $version)
     [IO.File]::WriteAllText($theme, $themeText, (New-Object Text.UTF8Encoding($false)))
+    $legacyRepair = Join-Path $output 'gocast-1.0.2-repair.msi'
+    New-Legacy102RepairMsi -Destination $legacyRepair
     $object = Join-Path $output 'GoCastSetup.wixobj'
     $setup = Join-Path $output "gocast-$version-windows-x64-setup.exe"
     Invoke-PackageTool (Join-Path $wixBin 'candle.exe') @(
         '-nologo', '-ext', 'WixBalExtension', '-ext', 'WixUtilExtension', "-dVersion=$version", "-dMsiPath=$msi",
+        "-dLegacy102RepairPath=$legacyRepair", "-dLegacy102ProductCode=$legacyProductCode",
         "-dIconPath=$(Join-Path $desktop 'desktopApp\icons\icon.ico')",
         "-dLogoPath=$(Join-Path $workspace 'branding\gocast_logo.png')", "-dThemePath=$theme", "-dWebView2Path=$webview2",
         '-out', $object, (Join-Path $package 'GoCastSetup.wxs')
