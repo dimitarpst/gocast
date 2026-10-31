@@ -13,6 +13,13 @@
     <string name="reaching_pc">Trying to reach your PC…</string>
     <string name="refresh_cast">Picture stuck? Refresh</string>
     <string name="cancel_connecting">Cancel</string>
+    <string name="update_available">GoCast %1$s is ready</string>
+    <string name="update_button">Update</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_allow_hint">Android needs your OK once to let GoCast install its own updates.</string>
+    <string name="update_allow">Allow updates</string>
+    <string name="update_failed">The update didn\'t work: %1$s</string>
+    <string name="update_retry">Try again</string>
     <string name="find_on_wifi">Find on Wi-Fi</string>
     <string name="cast_to_pc">Cast to %1$s</string>
     <string name="last_connected">Last connected</string>

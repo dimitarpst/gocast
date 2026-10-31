@@ -34,6 +34,30 @@ class BeaconPayloadTest {
     }
 
     @Test
+    fun shortRoomBeaconFitsALegacyAdvertisementAndKeepsTheRoom() {
+        // A real 22-character id as DesktopIdentityStore makes them (16 random bytes).
+        val realRoom = "c-LvI7_-yz-o049SYstzww"
+        val bytes = BeaconPayload.encodeShortRoom("172.16.113.244", realRoom)!!
+        assertTrue(bytes.size <= 24)
+        assertEquals(
+            BeaconInfo(displayName = "", host = "172.16.113.244", port = 0, roomId = realRoom),
+            BeaconPayload.decode(bytes),
+        )
+        // Bytes 0..15: every position of the alphabet's low range round-trips.
+        val counting = "AAECAwQFBgcICQoLDA0ODw"
+        assertEquals(counting, BeaconPayload.decode(BeaconPayload.encodeShortRoom("10.0.0.5", counting)!!)!!.roomId)
+    }
+
+    @Test
+    fun shortRoomBeaconOnlyTakesRoomsThatRoundTrip() {
+        // Longer custom ids do not fit; a last character with spare bits set would come back different.
+        assertNull(BeaconPayload.encodeShortRoom("10.0.0.5", "AbCdEfGhIjKlMnOpQrStUvWx"))
+        assertNull(BeaconPayload.encodeShortRoom("10.0.0.5", "AbCdEfGhIjKlMnOpQrStUv_"))
+        assertNull(BeaconPayload.encodeShortRoom("10.0.0.5", "AbCdEfGhIjKlMnOpQrStUB"))
+        assertNull(BeaconPayload.encodeShortRoom("fe80::1", room))
+    }
+
+    @Test
     fun rejectsIpv6InvalidRoomsAndForeignData() {
         assertNull(BeaconPayload.encode("fe80::1", 8765, "PC"))
         assertNull(BeaconPayload.encode("192.168.1.300", 8765, "PC"))

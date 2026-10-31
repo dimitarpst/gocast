@@ -9,6 +9,7 @@ import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import android.util.Log
 import app.gocast.domain.DiscoveredHost
 import app.gocast.protocol.BeaconPayload
 import kotlinx.coroutines.channels.awaitClose
@@ -21,9 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Finds GoCast PCs nearby from their Bluetooth LE beacons, even when they are
- * on another network. The Bluetooth 5 beacon carries the PC's relay room, so
- * joining goes through the relay with the usual pairing code; the short
- * beacon only has the LAN address.
+ * on another network. The room beacons carry the PC's relay room, so joining
+ * goes through the relay with the usual pairing code, LAN as fallback.
  */
 class GocastBluetoothDiscovery(context: Context) {
     private val appContext = context.applicationContext
@@ -43,6 +43,7 @@ class GocastBluetoothDiscovery(context: Context) {
             return@callbackFlow
         }
         val lastSeen = ConcurrentHashMap<String, Pair<DiscoveredHost, Long>>()
+        val heard = ConcurrentHashMap.newKeySet<String>()
 
         fun emitHosts() {
             val cutoff = SystemClock.elapsedRealtime() - STALE_AFTER_MS
@@ -55,21 +56,23 @@ class GocastBluetoothDiscovery(context: Context) {
                 val data = result.scanRecord
                     ?.getManufacturerSpecificData(BeaconPayload.COMPANY_ID) ?: return
                 val beacon = BeaconPayload.decode(data) ?: return
-                // Both beacons of one PC share its address; keep the room and
-                // the longer name once the Bluetooth 5 one has been heard.
-                val key = "bt:${beacon.host}:${beacon.port}"
+                // One PC sends up to three beacons with the same IPv4: name (v1),
+                // room (v3, no name or port) and both (v2, Bluetooth 5 only).
+                // Merge them: the room from any, the fullest name, a known port.
+                val key = "bt:${beacon.host}"
                 val known = lastSeen[key]?.first
-                val roomId = beacon.roomId ?: known?.roomId
+                val kind = when {
+                    beacon.port == 0 -> "room"
+                    beacon.roomId != null -> "room+name (Bluetooth 5)"
+                    else -> "name"
+                }
+                if (heard.add("$key $kind")) Log.i(TAG, "Heard $kind beacon from ${beacon.host}")
                 lastSeen[key] = DiscoveredHost(
-                    displayName = if (beacon.roomId == null && known?.roomId != null) {
-                        known.displayName
-                    } else {
-                        beacon.displayName
-                    },
+                    displayName = mergedName(beacon.displayName, known?.displayName),
                     host = beacon.host,
-                    port = beacon.port,
+                    port = beacon.port.takeIf { it != 0 } ?: known?.port ?: DEFAULT_PC_PORT,
                     instanceId = key,
-                    roomId = roomId,
+                    roomId = beacon.roomId ?: known?.roomId,
                 ) to SystemClock.elapsedRealtime()
                 emitHosts()
             }
@@ -110,10 +113,23 @@ class GocastBluetoothDiscovery(context: Context) {
         }
     }
 
+    /**
+     * The room beacon has no name; the name beacon cuts it to 15 bytes, which the
+     * Bluetooth 5 beacon may already have sent in full.
+     */
+    private fun mergedName(heard: String, known: String?): String = when {
+        heard.isBlank() -> known ?: "GoCast PC"
+        known != null && known.length > heard.length && known.startsWith(heard) -> known
+        else -> heard
+    }
+
     private fun adapter() =
         (appContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
 
     private companion object {
+        const val TAG = "BluetoothDiscovery"
         const val STALE_AFTER_MS = 10_000L
+        /** The PC's signaling port, for a PC heard only through its room beacon. */
+        const val DEFAULT_PC_PORT = 8765
     }
 }
