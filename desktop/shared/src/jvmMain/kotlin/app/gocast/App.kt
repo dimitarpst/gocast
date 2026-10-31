@@ -138,7 +138,7 @@ fun App(
                 )
                 if (phoneConnected && !castingActive) {
                     Text(
-                        text = "Phone connected — accept screen sharing on your phone",
+                        text = "Phone connected. Accept screen sharing on your phone",
                         color = GocastText,
                         fontSize = 13.sp,
                         modifier = Modifier

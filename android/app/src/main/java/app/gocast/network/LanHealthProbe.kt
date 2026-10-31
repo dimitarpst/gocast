@@ -51,9 +51,9 @@ object LanHealthProbe {
     fun explainFailure(host: String, port: Int, cause: Throwable?, triedRemote: Boolean = false): String {
         return when (check(host, port)) {
             Result.GocastOk ->
-                "Reached the PC but casting didn't start — open gocast on the PC and scan again."
+                "Reached the PC but casting didn't start. Open gocast on the PC and scan again."
             Result.NotGocast ->
-                "Something else is using $host:$port — make sure gocast is running on the PC."
+                "Something else is using $host:$port. Make sure gocast is running on the PC."
             Result.Unreachable -> unreachableMessage(cause, triedRemote)
         }
     }

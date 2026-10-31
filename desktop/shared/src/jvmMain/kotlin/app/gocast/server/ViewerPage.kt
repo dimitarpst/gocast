@@ -642,7 +642,7 @@ object ViewerPage {
         } else if (state === 'connecting') {
           setStatus('Connecting…');
         } else if (state === 'failed' || state === 'closed' || state === 'disconnected') {
-          setStatus('Connection lost — waiting for phone…');
+          setStatus('Connection lost. Waiting for phone…');
           if (state === 'failed') scheduleRecovery(0);
           if (state === 'disconnected') scheduleRecovery(RECOVER_AFTER_DISCONNECT_MS);
         }

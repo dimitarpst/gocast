@@ -47,7 +47,7 @@ fun DesktopUpdateControl(canInstall: Boolean) {
     var visible by remember { mutableStateOf(false) }
     TextButton(onClick = { visible = true }) {
         val suffix = if (ReleaseInfo.isDevelopment) " Dev" else ""
-        Text("GoCast ${ReleaseInfo.version}$suffix · Updates", style = MaterialTheme.typography.bodySmall)
+        Text("gocast ${ReleaseInfo.version}$suffix · Updates", style = MaterialTheme.typography.bodySmall)
     }
     if (visible) UpdateDialog(canInstall, onDismiss = { visible = false })
 }
@@ -89,7 +89,7 @@ private fun UpdateDialog(canInstall: Boolean, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = { job?.cancel(); onDismiss() },
-        title = { Text("GoCast updates") },
+        title = { Text("gocast updates") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Version ${ReleaseInfo.version}${if (ReleaseInfo.isDevelopment) " · Development build" else ""}")
@@ -115,7 +115,7 @@ private fun UpdateDialog(canInstall: Boolean, onDismiss: () -> Unit) {
                         if (!canInstall) Text("Finish casting and disconnect your phone before opening setup.")
                     }
                     is UpdateState.Failed -> Text(current.message)
-                    UpdateState.Opened -> Text("Setup is open. Follow its instructions to finish updating; GoCast will stay open until you close it.")
+                    UpdateState.Opened -> Text("Setup is open. Follow its instructions to finish updating. gocast will stay open until you close it.")
                 }
             }
         },

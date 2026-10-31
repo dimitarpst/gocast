@@ -50,7 +50,7 @@ object SettingHelpCatalog {
         title = "Picture size",
         body = "How big the picture is that gets sent to your PC.\n\n" +
             "100% means every pixel from your phone screen. " +
-            "Lower values shrink the picture first — it uses less Wi‑Fi and phone power, " +
+            "Lower values shrink the picture first. It uses less Wi‑Fi and phone power, " +
             "but text and fine detail look softer.\n\n" +
             "Tip: a slightly smaller, clear picture usually looks better than a huge " +
             "picture that your network can't keep up with.",
@@ -88,14 +88,14 @@ object SettingHelpCatalog {
         title = "Preferred format",
         body = "A codec is how your phone compresses the screen picture before sending it over Wi‑Fi. " +
             "The right choice can keep the phone cool and the text sharp; the wrong one can heat the " +
-            "phone and make everything look soft — often more than changing bitrate a little.\n\n" +
-            "• H.264 — Best default. Uses a dedicated chip on most phones (cooler, sharper text). " +
+            "phone and make everything look soft, often more than changing bitrate a little.\n\n" +
+            "• H.264: Best default. Uses a dedicated chip on most phones (cooler, sharper text). " +
             "Almost every PC can play it.\n\n" +
-            "• H.265 — Same hardware idea, often clearer at the same Wi‑Fi use. " +
+            "• H.265: Same hardware idea, often clearer at the same Wi‑Fi use. " +
             "Your PC must support it or the cast may fail or fall back.\n\n" +
-            "• VP8 / VP9 — Often run in software on Android, so the phone works harder and " +
+            "• VP8 / VP9: Often run in software on Android, so the phone works harder and " +
             "screen text can look mushier. Fine as fallbacks if H.264/H.265 aren’t available.\n\n" +
-            "• AV1 — Rare on phones. Only pick this if you know both the phone and the PC support it.\n\n" +
+            "• AV1: Rare on phones. Only pick this if you know both the phone and the PC support it.\n\n" +
             "Tip: stick with H.264 unless you’re experimenting. A software codec hurts Phone and " +
             "Clarity more than bumping Max bitrate one step.\n\n" +
             "Changing this while casting briefly reconnects the video (no need to reshare).",
@@ -112,7 +112,7 @@ object SettingHelpCatalog {
             "Higher = sharper picture when Wi‑Fi is strong. " +
             "Too high for your network causes lag and stuttering.\n\n" +
             "A good everyday starting point is around 8 Mbps on home Wi‑Fi. " +
-            "If the picture looks blocky, try raising this — or lowering resolution if Wi‑Fi is weak.",
+            "If the picture looks blocky, try raising this, or lowering resolution if Wi‑Fi is weak.",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
             CostChip(CostAxis.WIFI, CostWeight.HEAVY),
@@ -174,10 +174,10 @@ object SettingHelpCatalog {
     val degradation = SettingHelp(
         title = "When the connection struggles",
         body = "What to sacrifice first if Wi‑Fi or the phone can’t keep up:\n\n" +
-            "• Keep it sharp — picture stays sharp; motion may hitch (great for text).\n" +
-            "• Keep it smooth — motion stays smooth; picture may soften (great for games).\n" +
-            "• Balance both — a bit of each.\n" +
-            "• Do nothing — don’t auto-adjust.",
+            "• Keep it sharp: picture stays sharp; motion may hitch (great for text).\n" +
+            "• Keep it smooth: motion stays smooth; picture may soften (great for games).\n" +
+            "• Balance both: a bit of each.\n" +
+            "• Do nothing: don’t auto-adjust.",
         costs = listOf(
             CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
             CostChip(CostAxis.MOTION, CostWeight.HEAVY),

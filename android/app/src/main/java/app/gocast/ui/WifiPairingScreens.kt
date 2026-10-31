@@ -47,6 +47,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.Image
 import app.gocast.R
 import app.gocast.domain.DiscoveredHost
 import app.gocast.ui.components.PAIRING_CODE_LENGTH
@@ -158,11 +169,10 @@ private fun FindPcsScreen(
                     Text(fixLabel)
                 }
             } else if (hosts.isEmpty()) {
-                Text(
+                TextWithLogo(
                     if (waitedLong) nothingYet else looking,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 20.dp, start = 16.dp, end = 16.dp),
                 )
             } else {
@@ -180,6 +190,49 @@ private fun FindPcsScreen(
         }
     }
 }
+
+/** Centred text where the word "gocast" is drawn as the logo, sized to the text. */
+@Composable
+private fun TextWithLogo(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val at = text.indexOf(LOGO_WORD)
+    if (at < 0) {
+        Text(text, style = style, color = color, textAlign = TextAlign.Center, modifier = modifier)
+        return
+    }
+    val annotated = buildAnnotatedString {
+        append(text.substring(0, at))
+        appendInlineContent(LOGO_WORD, LOGO_WORD)
+        append(text.substring(at + LOGO_WORD.length))
+    }
+    val logo = mapOf(
+        LOGO_WORD to InlineTextContent(
+            // The logo is about 3.6 times as wide as it is tall.
+            Placeholder(width = 3.4.em, height = 0.95.em, PlaceholderVerticalAlign.TextCenter),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.gocast_logo),
+                contentDescription = LOGO_WORD,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+    )
+    Text(
+        annotated,
+        style = style,
+        color = color,
+        textAlign = TextAlign.Center,
+        inlineContent = logo,
+        modifier = modifier,
+    )
+}
+
+private const val LOGO_WORD = "gocast"
 
 /** The pairing code for one PC. Shows progress and the failure reason on this screen. */
 @Composable

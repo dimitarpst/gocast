@@ -31,7 +31,7 @@ class DesktopIdentityStore(
     }
 
     fun updateDisplayName(displayName: String): DesktopIdentity {
-        val cleaned = displayName.trim().ifBlank { "GoCast PC" }
+        val cleaned = displayName.trim().ifBlank { "gocast PC" }
         val current = loadOrCreateIdentity()
         val updated = current.copy(displayName = cleaned.take(48))
         persist(updated)
@@ -72,9 +72,9 @@ class DesktopIdentityStore(
 
     private fun createAndPersistIdentity(): DesktopIdentity {
         val hostName = runCatching { java.net.InetAddress.getLocalHost().hostName }
-            .getOrDefault("GoCast PC")
+            .getOrDefault("gocast PC")
             .substringBefore('.')
-            .ifBlank { "GoCast PC" }
+            .ifBlank { "gocast PC" }
         val identity = DesktopIdentity(
             instanceId = UUID.randomUUID().toString(),
             displayName = hostName,

@@ -125,7 +125,7 @@ fun LanSetupScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "You'll see a Windows security prompt — choose Yes. " +
+                        text = "You'll see a Windows security prompt. Choose Yes. " +
                             "gocast opens LAN access on both Private and Public networks " +
                             "(home Wi‑Fi is often marked Public).",
                         color = Color(0xFF7E8798),

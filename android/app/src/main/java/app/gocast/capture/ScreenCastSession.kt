@@ -145,7 +145,7 @@ class ScreenCastSession(
             mainHandler.post {
                 Toast.makeText(
                     appContext,
-                    "Casting without audio — mic permission not granted. " +
+                    "Casting without audio: mic permission not granted. " +
                         "If this app was sideloaded, check Settings > Apps > gocast > " +
                         "(3-dot menu) Allow restricted settings, then re-enable Microphone.",
                     Toast.LENGTH_LONG,

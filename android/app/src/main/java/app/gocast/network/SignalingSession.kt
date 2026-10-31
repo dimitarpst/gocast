@@ -289,8 +289,8 @@ class SignalingSession(
 
     private companion object {
         const val TAG = "SignalingSession"
-        const val WRONG_CODE = "Wrong code or QR — open gocast on the PC and try again."
-        const val PC_UNREACHABLE = "Can't reach your PC. Is GoCast open on it?"
+        const val WRONG_CODE = "Wrong code or QR. Open gocast on the PC and try again."
+        const val PC_UNREACHABLE = "Can't reach your PC. Is gocast open on it?"
         const val NO_INTERNET = "This phone has no internet. Turn on Wi-Fi or mobile data."
         const val REMOTE_HANDSHAKE_MS = 12_000L
         /** The PC answers through the relay in under 100 ms; a silent attempt is stuck. */

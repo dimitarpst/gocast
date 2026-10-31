@@ -80,7 +80,7 @@ private fun UnlockRelayDialog(onDismiss: () -> Unit) {
             val reply = RelayAccess.unlock?.invoke(password)
             busy = false
             when {
-                reply == null -> error = "Couldn't reach the GoCast server. Check your connection and try again."
+                reply == null -> error = "Couldn't reach the gocast server. Check your connection and try again."
                 reply.state == RelayState.On -> onDismiss()
                 reply.error == RelayError.TooManyAttempts -> error = "Too many tries. Wait an hour, then try again."
                 reply.error == RelayError.WrongPassword -> error = "That password isn't right."

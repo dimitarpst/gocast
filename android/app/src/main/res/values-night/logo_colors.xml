@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The "cast" half of the logo in dark mode: the original near-white. -->
+    <color name="gocast_logo_cast">#FFFEFDFD</color>
+</resources>

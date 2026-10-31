@@ -118,7 +118,7 @@ class GocastBluetoothDiscovery(context: Context) {
      * Bluetooth 5 beacon may already have sent in full.
      */
     private fun mergedName(heard: String, known: String?): String = when {
-        heard.isBlank() -> known ?: "GoCast PC"
+        heard.isBlank() -> known ?: "gocast PC"
         known != null && known.length > heard.length && known.startsWith(heard) -> known
         else -> heard
     }

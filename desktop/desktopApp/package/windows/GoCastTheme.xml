@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Original GoCast theme using WixStdBA's documented control names. -->
 <Theme xmlns="http://wixtoolset.org/schemas/thmutil/2010">
-  <Window Width="580" Height="420" HexStyle="100a0000" FontId="0">GoCast setup</Window>
+  <Window Width="580" Height="420" HexStyle="100a0000" FontId="0">gocast setup</Window>
   <Font Id="0" Height="-14" Weight="400" Foreground="E8ECF5" Background="12141A">Segoe UI</Font>
   <Font Id="1" Height="-28" Weight="600" Foreground="E8ECF5" Background="12141A">Segoe UI</Font>
   <Font Id="2" Height="-14" Weight="400" Foreground="AAB4C7" Background="12141A">Segoe UI</Font>
@@ -14,12 +14,12 @@
   </Page>
   <Page Name="Install">
     <Text X="32" Y="158" Width="510" Height="48" FontId="1">Your phone. A bigger screen.</Text>
-    <Text X="32" Y="218" Width="510" Height="70" FontId="2">Install GoCast on this PC to receive your phone screen over Wi-Fi.</Text>
+    <Text X="32" Y="218" Width="510" Height="70" FontId="2">Install gocast on this PC to see your phone's screen on it.</Text>
     <Button Name="InstallButton" X="32" Y="-32" Width="180" Height="38" FontId="4" TabStop="yes">#(loc.InstallInstallButton)</Button>
     <Button Name="WelcomeCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Close</Button>
   </Page>
   <Page Name="Modify">
-    <Text X="32" Y="158" Width="510" Height="48" FontId="1">Manage GoCast</Text>
+    <Text X="32" Y="158" Width="510" Height="48" FontId="1">Manage gocast</Text>
     <Text X="32" Y="218" Width="510" Height="70" FontId="2">Repair the app or remove it from this PC. Your personal settings are kept.</Text>
     <Button Name="RepairButton" X="32" Y="-32" Width="144" Height="38" FontId="4" TabStop="yes" HideWhenDisabled="yes">Repair</Button>
     <Button Name="UninstallButton" X="192" Y="-32" Width="144" Height="38" FontId="4" TabStop="yes">Uninstall</Button>
@@ -41,9 +41,9 @@
   </Page>
   <Page Name="Success">
     <Text Name="SuccessHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">#(loc.SuccessHeader)</Text>
-    <Text Name="SuccessInstallHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">GoCast is ready.</Text>
+    <Text Name="SuccessInstallHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">gocast is ready.</Text>
     <Text Name="SuccessRepairHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">Repair complete.</Text>
-    <Text Name="SuccessUninstallHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">GoCast has been removed.</Text>
+    <Text Name="SuccessUninstallHeader" X="32" Y="158" Width="510" Height="54" FontId="1" HideWhenDisabled="yes">gocast has been removed.</Text>
     <Text Name="SuccessRestartText" X="32" Y="230" Width="510" Height="58" FontId="2" HideWhenDisabled="yes">#(loc.SuccessRestartText)</Text>
     <Button Name="SuccessRestartButton" X="32" Y="-32" Width="144" Height="38" FontId="4" TabStop="yes" HideWhenDisabled="yes">Restart</Button>
     <Button Name="SuccessCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Done</Button>
@@ -60,7 +60,7 @@
     <Button Name="FailureCloseButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Close</Button>
   </Page>
   <Page Name="Help">
-    <Text X="32" Y="150" Width="510" Height="42" FontId="1">GoCast setup</Text>
+    <Text X="32" Y="150" Width="510" Height="42" FontId="1">gocast setup</Text>
     <Text X="32" Y="208" Width="510" Height="120" FontId="2">#(loc.HelpText)</Text>
     <Button Name="HelpCancelButton" X="-32" Y="-32" Width="100" Height="38" FontId="4" TabStop="yes">Close</Button>
   </Page>
