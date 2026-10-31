@@ -63,7 +63,7 @@ class CastViewModel(application: Application) : AndroidViewModel(application) {
             CastConnection.paired.collect { paired ->
                 val trust = paired.trustToken ?: return@collect
                 val instanceId = paired.instanceId ?: return@collect
-                val name = paired.displayName ?: "GoCast PC"
+                val name = paired.displayName ?: "gocast PC"
                 // A LAN-only join (Find on Wi-Fi) must not forget a room learned from the QR.
                 val previous = _trustedPc.value?.takeIf { it.instanceId == instanceId }
                 val pc = TrustedPc(
