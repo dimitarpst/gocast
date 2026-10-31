@@ -48,10 +48,13 @@ class GocastAdvertiser {
             port,
             0,
             0,
-            mapOf(
-                "id" to instanceId,
-                "name" to displayName,
-            ),
+            buildMap {
+                put("id", instanceId)
+                put("name", displayName)
+                // Lets Find on Wi-Fi join through the relay too, so a network that
+                // blocks phone-to-PC traffic (guest/isolated Wi-Fi) still works.
+                roomId?.let { put("room", it) }
+            },
         )
         dns.registerService(info)
         jmdns = dns

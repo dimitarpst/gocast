@@ -5,8 +5,8 @@ import java.io.File
 
 /**
  * Broadcasts this PC's Bluetooth LE beacons so a phone nearby can find it on
- * any network: a short one (name + LAN address) every phone hears, and a
- * Bluetooth 5 one that adds the relay room. Windows only: the WinRT
+ * any network: two short ones every phone hears (name + LAN address, and the
+ * relay room), taking turns, plus a Bluetooth 5 one with both. Windows only: the WinRT
  * publishers run in a hidden Windows PowerShell child (`ble-beacon.ps1`),
  * which also exits on its own if this app dies.
  */
@@ -19,6 +19,8 @@ class BluetoothBeacon {
         if (!System.getProperty("os.name").orEmpty().startsWith("Windows")) return
         val payload = BeaconPayload.encode(host, port, displayName) ?: return
         val roomPayload = roomId?.let { BeaconPayload.encodeWithRoom(host, port, displayName, it) }
+        // Legacy room beacon for phones/PCs without Bluetooth 5 extended advertising.
+        val shortRoomPayload = roomId?.let { BeaconPayload.encodeShortRoom(host, it) }
         val file = script ?: extractScript()?.also { script = it } ?: return
         val args = mutableListOf(
             "powershell.exe",
@@ -31,6 +33,7 @@ class BluetoothBeacon {
             "-CompanyId", BeaconPayload.COMPANY_ID.toString(),
         )
         if (roomPayload != null) args += listOf("-RoomPayload", roomPayload.toCsv())
+        if (shortRoomPayload != null) args += listOf("-ShortRoomPayload", shortRoomPayload.toCsv())
         process = runCatching {
             ProcessBuilder(args)
                 .redirectErrorStream(true)

@@ -31,6 +31,12 @@ android {
         targetSdk = 36
         versionCode = releaseVersionCode
         versionName = releaseVersion
+        // In-app updates read the same GitHub releases as the PC (release.properties).
+        buildConfigField(
+            "String",
+            "RELEASE_REPOSITORY",
+            "\"${requireNotNull(releaseInfo.getProperty("repository"))}\"",
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

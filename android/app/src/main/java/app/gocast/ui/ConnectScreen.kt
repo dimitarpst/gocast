@@ -73,7 +73,10 @@ import app.gocast.ui.components.ConnectionActionSymbol
 import app.gocast.ui.components.LastConnectedCard
 import app.gocast.ui.components.PAIRING_CODE_LENGTH
 import app.gocast.ui.components.PairingCodeInput
+import app.gocast.ui.components.UpdateCard
 import app.gocast.ui.quality.QualitySettingsScreen
+import app.gocast.update.PhoneUpdateState
+import app.gocast.update.UpdateViewModel
 import kotlinx.coroutines.awaitCancellation
 
 private enum class ConnectMode {
@@ -100,8 +103,10 @@ fun ConnectScreen(
     startWithQualitySettings: Boolean = false,
     onShowWalkthrough: () -> Unit = {},
     viewModel: CastViewModel = viewModel(),
+    updateViewModel: UpdateViewModel = viewModel(),
 ) {
     val context = LocalContext.current
+    val updateState by updateViewModel.state.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val trustedPc by viewModel.trustedPc.collectAsStateWithLifecycle()
     val discoveredHosts by viewModel.discoveredHosts.collectAsStateWithLifecycle()
@@ -143,6 +148,13 @@ fun ConnectScreen(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Back from Android's "Install unknown apps" setting: finish a waiting update.
+    LaunchedEffect(updateViewModel, lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            updateViewModel.onResumed()
+        }
+    }
 
     // Only while resumed — Quick Cast owns consent when the app is in the background.
     LaunchedEffect(viewModel, lifecycleOwner) {
@@ -419,6 +431,16 @@ fun ConnectScreen(
                     onRefresh = { viewModel.refreshCast() },
                     onQuality = { mode = ConnectMode.Quality },
                     onShowWalkthrough = onShowWalkthrough,
+                    updateState = updateState,
+                    onUpdate = { updateViewModel.startUpdate() },
+                    onAllowInstalls = {
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:${context.packageName}"),
+                            ),
+                        )
+                    },
                 )
             }
 
@@ -454,6 +476,9 @@ private fun HomeContent(
     onRefresh: () -> Unit,
     onQuality: () -> Unit,
     onShowWalkthrough: () -> Unit,
+    updateState: PhoneUpdateState,
+    onUpdate: () -> Unit,
+    onAllowInstalls: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
     // Connecting, or retrying after a failure (the connector keeps trying until stopped).
@@ -543,6 +568,14 @@ private fun HomeContent(
                 )
             }
             Spacer(Modifier.height(28.dp))
+        }
+
+        // Updates only while nothing is under way: installing restarts the app.
+        if (connectionState is ConnectionState.Idle && !isActiveCast &&
+            updateState != PhoneUpdateState.None
+        ) {
+            UpdateCard(state = updateState, onUpdate = onUpdate, onAllowInstalls = onAllowInstalls)
+            Spacer(Modifier.height(20.dp))
         }
 
         if (trying && !isActiveCast) {

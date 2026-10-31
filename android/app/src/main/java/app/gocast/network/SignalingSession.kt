@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.net.UnknownHostException
 
 class SignalingSession(
     private val httpClient: HttpClient = GocastHttpClient.instance,
@@ -58,6 +59,14 @@ class SignalingSession(
             when (val remote = openRemote(roomId, params.token)) {
                 is RemoteAttempt.Ok -> return remote.result
                 RemoteAttempt.Rejected -> return HelloResult.Failed(WRONG_CODE)
+                RemoteAttempt.NoInternet -> {
+                    // A Wi-Fi without internet can still reach a PC on it directly.
+                    if (canTryLan()) {
+                        val lan = openLan(params.host, params.port, params.token, triedRemote = true)
+                        if (lan is HelloResult.Ok) return lan
+                    }
+                    return HelloResult.Failed(NO_INTERNET)
+                }
                 RemoteAttempt.Unavailable -> {
                     if (!canTryLan()) {
                         Log.i(TAG, "Remote signaling unavailable; not on Wi-Fi, so no LAN fallback")
@@ -76,6 +85,8 @@ class SignalingSession(
         data object Rejected : RemoteAttempt
         /** Worker unreachable or PC not connected to its room. */
         data object Unavailable : RemoteAttempt
+        /** The relay's own name did not resolve: this phone has no working internet. */
+        data object NoInternet : RemoteAttempt
     }
 
     private suspend fun openRemote(roomId: String, token: String): RemoteAttempt {
@@ -88,6 +99,10 @@ class SignalingSession(
             }
         } catch (e: Exception) {
             Log.i(TAG, "Remote signaling: ${e.message ?: e.javaClass.simpleName}")
+            // 31 Oct: the phone said "can't reach the PC" while it simply had no internet.
+            if (generateSequence<Throwable>(e) { it.cause }.any { it is UnknownHostException }) {
+                return RemoteAttempt.NoInternet
+            }
             null
         } ?: return RemoteAttempt.Unavailable
         Log.i(TAG, "Relay: connected in ${SystemClock.elapsedRealtime() - started} ms")
@@ -276,6 +291,7 @@ class SignalingSession(
         const val TAG = "SignalingSession"
         const val WRONG_CODE = "Wrong code or QR — open gocast on the PC and try again."
         const val PC_UNREACHABLE = "Can't reach your PC. Is GoCast open on it?"
+        const val NO_INTERNET = "This phone has no internet. Turn on Wi-Fi or mobile data."
         const val REMOTE_HANDSHAKE_MS = 12_000L
         /** The PC answers through the relay in under 100 ms; a silent attempt is stuck. */
         const val REMOTE_HELLO_MS = 3_000L
