@@ -89,7 +89,7 @@ class ScreenCastSession(
         lastHeight = h
         val screenCapturer = capturer as? GocastScreenCapturer ?: return
         try {
-            screenCapturer.applyDisplayParams(w, h, next.virtualDisplayDpi)
+            screenCapturer.applyDisplayParams(w, h, next.virtualDisplayDpi, next.captureFps)
         } catch (e: Exception) {
             Log.w(TAG, "applyDisplayParams failed", e)
         }
@@ -224,7 +224,9 @@ class ScreenCastSession(
         val helper = SurfaceTextureHelper.create("GocastCapture", egl.eglBaseContext)
         surfaceHelper = helper
 
-        val source = pcFactory.createVideoSource(true)
+        // Treat the phone screen as live motion video (isScreencast = false) so WebRTC
+        // doesn't engage slide-mode frame dropping during full-screen UI animations.
+        val source = pcFactory.createVideoSource(false)
         videoSource = source
 
         if (existingCapturer != null) {
@@ -297,7 +299,7 @@ class ScreenCastSession(
         try {
             val screenCapturer = capturer as? GocastScreenCapturer
             if (screenCapturer != null) {
-                screenCapturer.applyDisplayParams(w, h, quality.virtualDisplayDpi)
+                screenCapturer.applyDisplayParams(w, h, quality.virtualDisplayDpi, quality.captureFps)
             } else {
                 capturer?.changeCaptureFormat(w, h, quality.captureFps)
             }

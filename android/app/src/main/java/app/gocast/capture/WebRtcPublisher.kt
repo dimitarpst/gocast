@@ -262,7 +262,12 @@ class WebRtcPublisher(
                     Log.i(TAG, "Phone offers video codecs: ${videoCodecs(desc.description).joinToString()}")
                     val offer = SessionDescription(
                         desc.type,
-                        preferHighQualityOpus(desc.description),
+                        applyVideoBitrateHints(
+                            preferHighQualityOpus(desc.description),
+                            startKbps = quality.startBitrateBps / 1000,
+                            minKbps = quality.minBitrateBps / 1000,
+                            maxKbps = quality.maxBitrateBps / 1000,
+                        ),
                     )
                     pc.setLocalDescription(
                         object : SdpObserver {
@@ -388,16 +393,10 @@ class WebRtcPublisher(
     private fun applyVideoEncoding(pc: PeerConnection) {
         val sender = pc.senders.firstOrNull { it.track()?.id() == videoTrack.id() } ?: return
         val params = sender.parameters
-        params.degradationPreference = when (quality.degradationPreference) {
-            CastQualitySettings.DegradationPreference.DISABLED ->
-                RtpParameters.DegradationPreference.DISABLED
-            CastQualitySettings.DegradationPreference.MAINTAIN_FRAMERATE ->
-                RtpParameters.DegradationPreference.MAINTAIN_FRAMERATE
-            CastQualitySettings.DegradationPreference.MAINTAIN_RESOLUTION ->
-                RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
-            CastQualitySettings.DegradationPreference.BALANCED ->
-                RtpParameters.DegradationPreference.BALANCED
-        }
+        // Disable WebRTC's automatic resolution/FPS adaptation: on Android MediaCodec,
+        // dynamic resolution changes tear down and recreate the hardware encoder mid-animation,
+        // causing 100-300 ms stalls on blur/scroll transitions.
+        params.degradationPreference = RtpParameters.DegradationPreference.DISABLED
         val networkPriority = when (quality.networkPriority) {
             CastQualitySettings.NetworkPriority.VERY_LOW ->
                 org.webrtc.Priority.VERY_LOW
@@ -492,6 +491,71 @@ class WebRtcPublisher(
                     "a=fmtp:$pt $params"
                 }
             }
+        }
+
+        /**
+         * Hint BWE bitrate bounds in SDP so both Android libwebrtc and Chromium start
+         * with full LAN headroom instead of ramping up from ~300 kbps after idle frames.
+         */
+        fun applyVideoBitrateHints(
+            sdp: String,
+            startKbps: Int,
+            minKbps: Int,
+            maxKbps: Int,
+        ): String {
+            val videoSection = sdp.substringAfter("m=video", "").substringBefore("m=audio")
+            if (videoSection.isEmpty()) return sdp
+            val ignored = setOf("rtx", "red", "ulpfec", "flexfec-03")
+            val videoPts = Regex("""a=rtpmap:(\d+) ([\w-]+)/90000""")
+                .findAll(videoSection)
+                .filter { it.groupValues[2].lowercase() !in ignored }
+                .map { it.groupValues[1] }
+                .toSet()
+            if (videoPts.isEmpty()) return sdp
+
+            val eol = if (sdp.contains("\r\n")) "\r\n" else "\n"
+            val lines = sdp.split(eol)
+            val existingFmtpPts = mutableSetOf<String>()
+            var inVideo = false
+            for (line in lines) {
+                if (line.startsWith("m=")) inVideo = line.startsWith("m=video")
+                if (!inVideo) continue
+                val m = Regex("""^a=fmtp:(\d+) """).find(line)
+                if (m != null) existingFmtpPts.add(m.groupValues[1])
+            }
+
+            fun withHints(params: String): String {
+                var p = params
+                if (startKbps > 0) p = upsertFmtpParam(p, "x-google-start-bitrate", startKbps.toString())
+                if (minKbps > 0) p = upsertFmtpParam(p, "x-google-min-bitrate", minKbps.toString())
+                if (maxKbps > 0) p = upsertFmtpParam(p, "x-google-max-bitrate", maxKbps.toString())
+                return p
+            }
+
+            val out = mutableListOf<String>()
+            inVideo = false
+            for (line in lines) {
+                if (line.startsWith("m=")) inVideo = line.startsWith("m=video")
+                if (inVideo) {
+                    val fmtp = Regex("""^a=fmtp:(\d+) (.*)$""").matchEntire(line)
+                    if (fmtp != null && fmtp.groupValues[1] in videoPts) {
+                        out.add("a=fmtp:${fmtp.groupValues[1]} ${withHints(fmtp.groupValues[2])}")
+                        continue
+                    }
+                    out.add(line)
+                    val rtpmap = Regex("""^a=rtpmap:(\d+) """).find(line)
+                    if (rtpmap != null) {
+                        val pt = rtpmap.groupValues[1]
+                        if (pt in videoPts && pt !in existingFmtpPts) {
+                            val hints = withHints("")
+                            if (hints.isNotEmpty()) out.add("a=fmtp:$pt $hints")
+                        }
+                    }
+                } else {
+                    out.add(line)
+                }
+            }
+            return out.joinToString(eol)
         }
 
         private fun upsertFmtpParam(params: String, key: String, value: String): String {

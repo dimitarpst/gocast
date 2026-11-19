@@ -19,7 +19,6 @@ object CastQualityStore {
     private const val KEY_PREFERRED_CODEC = "preferred_codec"
     private const val KEY_MAX_FRAMERATE = "max_framerate"
     private const val KEY_SCALE_DOWN = "scale_resolution_down_by"
-    private const val KEY_DEGRADATION = "degradation_preference"
     private const val KEY_BITRATE_PRIORITY = "bitrate_priority"
     private const val KEY_NETWORK_PRIORITY = "network_priority"
     private const val KEY_INTEL_VP8 = "enable_intel_vp8"
@@ -52,11 +51,6 @@ object CastQualityStore {
             scaleResolutionDownBy = Double.fromBits(
                 p.getLong(KEY_SCALE_DOWN, defaults.scaleResolutionDownBy.toRawBits()),
             ),
-            degradationPreference = runCatching {
-                CastQualitySettings.DegradationPreference.valueOf(
-                    p.getString(KEY_DEGRADATION, defaults.degradationPreference.name)!!,
-                )
-            }.getOrDefault(defaults.degradationPreference),
             bitratePriority = Double.fromBits(
                 p.getLong(KEY_BITRATE_PRIORITY, defaults.bitratePriority.toRawBits()),
             ),
@@ -81,7 +75,6 @@ object CastQualityStore {
             .putString(KEY_PREFERRED_CODEC, settings.preferredCodec.name)
             .putInt(KEY_MAX_FRAMERATE, settings.maxFramerate)
             .putLong(KEY_SCALE_DOWN, settings.scaleResolutionDownBy.toRawBits())
-            .putString(KEY_DEGRADATION, settings.degradationPreference.name)
             .putLong(KEY_BITRATE_PRIORITY, settings.bitratePriority.toRawBits())
             .putString(KEY_NETWORK_PRIORITY, settings.networkPriority.name)
             .putBoolean(KEY_INTEL_VP8, settings.enableIntelVp8Encoder)

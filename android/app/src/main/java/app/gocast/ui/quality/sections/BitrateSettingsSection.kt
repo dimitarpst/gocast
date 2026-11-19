@@ -2,7 +2,6 @@ package app.gocast.ui.quality.sections
 
 import androidx.compose.runtime.Composable
 import app.gocast.settings.CastQualitySettings
-import app.gocast.settings.CastQualitySettings.DegradationPreference
 import app.gocast.settings.CastQualitySettings.NetworkPriority
 import app.gocast.settings.SettingHelpCatalog
 import app.gocast.ui.quality.QualityUiActions
@@ -18,13 +17,6 @@ private fun maxBitrateLabel(mbps: Int): String = when (mbps) {
 }
 
 private fun minBitrateLabel(mbps: Int): String = if (mbps == 0) "No minimum" else "$mbps Mbps"
-
-private fun degradationLabel(pref: DegradationPreference): String = when (pref) {
-    DegradationPreference.DISABLED -> "Do nothing"
-    DegradationPreference.MAINTAIN_FRAMERATE -> "Keep it smooth"
-    DegradationPreference.MAINTAIN_RESOLUTION -> "Keep it sharp"
-    DegradationPreference.BALANCED -> "Balance both"
-}
 
 private fun networkPriorityLabel(priority: NetworkPriority): String = when (priority) {
     NetworkPriority.VERY_LOW -> "Very low"
@@ -123,19 +115,6 @@ fun StreamingSettingsSection(
                 settings.copy(
                     scaleResolutionDownBy = CastQualitySettings.ScaleDownOptions[index].first,
                 ),
-            )
-        },
-    )
-    OptionPicker(
-        label = "When the connection struggles",
-        selectedLabel = degradationLabel(settings.degradationPreference),
-        options = DegradationPreference.entries.map(::degradationLabel),
-        recommendedIndex = recommended.degradationPreference.ordinal,
-        help = SettingHelpCatalog.degradation,
-        onInfo = actions.onInfo,
-        onSelectIndex = { index ->
-            actions.onChange(
-                settings.copy(degradationPreference = DegradationPreference.entries[index]),
             )
         },
     )

@@ -27,31 +27,28 @@ object ViewerPage {
       background: #12141A;
     }
     /*
-     * Hardware-decoded <video> can composite above HTML overlays in embeds.
-     * Keep <video> as a tiny offscreen decoder and blit frames to <canvas>.
+     * Render hardware-decoded <video> directly via WebView2's GPU compositor
+     * (no 2D <canvas> blit or requestAnimationFrame loop).
+     * opacity: 0.999 keeps <video> inside the compositor pass so DirectComposition
+     * never promotes it above the HTML buttons/overlays on mouse hover.
      */
     #video {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      pointer-events: none;
-      left: -100px;
-      top: -100px;
-    }
-    #stage {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      background: #12141A;
+      object-fit: contain;
+      background: #000;
       z-index: 0;
+      opacity: 0.999;
+      pointer-events: none;
     }
     #status {
       position: absolute;
       left: 12px;
       bottom: 12px;
       z-index: 20;
+      transform: translateZ(0);
       opacity: 0.7;
       font-size: 12px;
       background: rgba(0,0,0,0.45);
@@ -64,6 +61,7 @@ object ViewerPage {
       position: absolute;
       inset: 0;
       z-index: 15;
+      transform: translateZ(0);
       align-items: center;
       justify-content: center;
       flex-direction: column;
@@ -95,6 +93,7 @@ object ViewerPage {
       top: 14px;
       left: 14px;
       z-index: 30;
+      transform: translateZ(0);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -204,6 +203,7 @@ object ViewerPage {
       top: 14px;
       right: 14px;
       z-index: 30;
+      transform: translateZ(0);
       box-sizing: border-box;
       width: 40px;
       height: 40px;
@@ -229,6 +229,7 @@ object ViewerPage {
       top: 14px;
       right: 62px;
       z-index: 30;
+      transform: translateZ(0);
       box-sizing: border-box;
       width: 40px;
       height: 40px;
@@ -254,6 +255,7 @@ object ViewerPage {
       top: 60px;
       right: 14px;
       z-index: 31;
+      transform: translateZ(0);
       min-width: 200px;
       padding: 6px;
       border-radius: 12px;
@@ -278,7 +280,6 @@ object ViewerPage {
 </head>
 <body>
   <div id="wrap">
-    <canvas id="stage" aria-hidden="true"></canvas>
     <video id="video" autoplay playsinline muted></video>
     <audio id="cast-audio" autoplay></audio>
     <div id="paused" aria-live="polite">
@@ -311,8 +312,6 @@ object ViewerPage {
     const statusEl = document.getElementById('status');
     const pausedEl = document.getElementById('paused');
     const video = document.getElementById('video');
-    const stage = document.getElementById('stage');
-    const stageCtx = stage.getContext('2d');
     // Picture and sound on separate elements — A/V on one <video> can freeze on frame 1.
     const audio = document.getElementById('cast-audio');
     const fab = document.getElementById('fab');
@@ -333,48 +332,8 @@ object ViewerPage {
     let videoStream = null;
     let audioStream = null;
     let streamPaused = false;
-    let paintRunning = false;
 
     function setStatus(text) { statusEl.textContent = text; }
-
-    function resizeStage() {
-      const dpr = window.devicePixelRatio || 1;
-      const w = stage.clientWidth;
-      const h = stage.clientHeight;
-      if (w < 1 || h < 1) return;
-      stage.width = Math.round(w * dpr);
-      stage.height = Math.round(h * dpr);
-      stageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-
-    function paintFrame() {
-      if (!paintRunning) return;
-      requestAnimationFrame(paintFrame);
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      if (!vw || !vh) return;
-      const cw = stage.clientWidth;
-      const ch = stage.clientHeight;
-      if (cw < 1 || ch < 1) return;
-      const scale = Math.min(cw / vw, ch / vh);
-      const dw = vw * scale;
-      const dh = vh * scale;
-      const dx = (cw - dw) / 2;
-      const dy = (ch - dh) / 2;
-      stageCtx.fillStyle = '#000';
-      stageCtx.fillRect(0, 0, cw, ch);
-      stageCtx.drawImage(video, dx, dy, dw, dh);
-    }
-
-    function startPaint() {
-      if (paintRunning) return;
-      paintRunning = true;
-      resizeStage();
-      requestAnimationFrame(paintFrame);
-    }
-
-    window.addEventListener('resize', resizeStage);
-    resizeStage();
 
     function setStreamPaused(paused) {
       streamPaused = paused;
@@ -604,6 +563,15 @@ object ViewerPage {
       pc.ontrack = (event) => {
         const kind = event.track.kind;
         if (kind === 'video') {
+          // Minimize Chromium's WebRTC jitter/playout buffer so motion bursts don't add lag.
+          if (event.receiver) {
+            try {
+              if ('jitterBufferTarget' in event.receiver) event.receiver.jitterBufferTarget = 0;
+            } catch (_) {}
+            try {
+              if ('playoutDelayHint' in event.receiver) event.receiver.playoutDelayHint = 0;
+            } catch (_) {}
+          }
           if (!videoStream) videoStream = new MediaStream();
           if (!videoStream.getTracks().includes(event.track)) {
             videoStream.addTrack(event.track);
@@ -612,7 +580,6 @@ object ViewerPage {
           video.muted = true;
           video.volume = 0;
           playEl(video);
-          startPaint();
         } else if (kind === 'audio') {
           if (!audioStream) audioStream = new MediaStream();
           if (!audioStream.getTracks().includes(event.track)) {

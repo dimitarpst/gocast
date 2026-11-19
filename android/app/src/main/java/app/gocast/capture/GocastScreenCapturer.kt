@@ -29,6 +29,9 @@ class GocastScreenCapturer(
     private var width = 0
     private var height = 0
     private var virtualDisplayDpi: Int = virtualDisplayDpi
+    @Volatile
+    private var minFrameIntervalNs: Long = 0L
+    private var lastForwardedTimestampNs: Long = Long.MIN_VALUE
     private var virtualDisplay: VirtualDisplay? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private var capturerObserver: CapturerObserver? = null
@@ -75,10 +78,12 @@ class GocastScreenCapturer(
     }
 
     @Synchronized
-    override fun startCapture(width: Int, height: Int, unusedFramerate: Int) {
+    override fun startCapture(width: Int, height: Int, framerate: Int) {
         checkNotDisposed()
         this.width = width
         this.height = height
+        updateTargetFps(framerate)
+        lastForwardedTimestampNs = Long.MIN_VALUE
 
         val helper = surfaceTextureHelper
             ?: throw IllegalStateException("No SurfaceTextureHelper")
@@ -143,14 +148,15 @@ class GocastScreenCapturer(
     }
 
     @Synchronized
-    override fun changeCaptureFormat(width: Int, height: Int, unusedFramerate: Int) {
-        applyDisplayParams(width, height, virtualDisplayDpi)
+    override fun changeCaptureFormat(width: Int, height: Int, framerate: Int) {
+        applyDisplayParams(width, height, virtualDisplayDpi, framerate)
     }
 
-    /** Resize and/or update VirtualDisplay density while capturing. */
+    /** Resize, update VirtualDisplay density, and/or update target FPS while capturing. */
     @Synchronized
-    fun applyDisplayParams(width: Int, height: Int, dpi: Int) {
+    fun applyDisplayParams(width: Int, height: Int, dpi: Int, targetFps: Int = 0) {
         checkNotDisposed()
+        if (targetFps > 0) updateTargetFps(targetFps)
         if (width <= 0 || height <= 0) return
         val w = width / 2 * 2
         val h = height / 2 * 2
@@ -169,9 +175,26 @@ class GocastScreenCapturer(
         }
     }
 
-    override fun isScreencast(): Boolean = true
+    private fun updateTargetFps(fps: Int) {
+        // 85% of the target frame interval: skips 120 Hz intermediate frames at 60 fps
+        // (~8.3 ms < 14.1 ms) without accidentally dropping steady 60 Hz frames (~16.6 ms).
+        minFrameIntervalNs = if (fps > 0) {
+            ((1_000_000_000L / fps) * 85L) / 100L
+        } else {
+            0L
+        }
+    }
+
+    // False so WebRTC uses smooth live-video rate control instead of slide-mode frame dropping.
+    override fun isScreencast(): Boolean = false
 
     override fun onFrame(frame: VideoFrame) {
+        val minInterval = minFrameIntervalNs
+        if (minInterval > 0L && lastForwardedTimestampNs != Long.MIN_VALUE) {
+            val deltaNs = frame.timestampNs - lastForwardedTimestampNs
+            if (deltaNs in 0 until minInterval) return
+        }
+        lastForwardedTimestampNs = frame.timestampNs
         numCapturedFrames++
         capturerObserver?.onFrameCaptured(frame)
     }

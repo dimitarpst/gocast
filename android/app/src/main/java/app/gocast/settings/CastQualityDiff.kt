@@ -22,7 +22,6 @@ object CastQualityDiff {
             old.startBitrateBps != new.startBitrateBps ||
             old.maxFramerate != new.maxFramerate ||
             old.scaleResolutionDownBy != new.scaleResolutionDownBy ||
-            old.degradationPreference != new.degradationPreference ||
             old.bitratePriority != new.bitratePriority ||
             old.networkPriority != new.networkPriority
 }

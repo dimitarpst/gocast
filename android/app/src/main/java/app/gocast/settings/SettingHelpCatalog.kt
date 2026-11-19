@@ -171,20 +171,6 @@ object SettingHelpCatalog {
         ),
     )
 
-    val degradation = SettingHelp(
-        title = "When the connection struggles",
-        body = "What to sacrifice first if Wi‑Fi or the phone can’t keep up:\n\n" +
-            "• Keep it sharp: picture stays sharp; motion may hitch (great for text).\n" +
-            "• Keep it smooth: motion stays smooth; picture may soften (great for games).\n" +
-            "• Balance both: a bit of each.\n" +
-            "• Do nothing: don’t auto-adjust.",
-        costs = listOf(
-            CostChip(CostAxis.CLARITY, CostWeight.HEAVY),
-            CostChip(CostAxis.MOTION, CostWeight.HEAVY),
-            CostChip(CostAxis.LATENCY, CostWeight.NOTICEABLE),
-        ),
-    )
-
     val networkPriority = SettingHelp(
         title = "Wi‑Fi priority",
         body = "Hints how important this cast’s traffic is on the network.\n\n" +
